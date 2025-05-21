@@ -36,62 +36,61 @@ enum NotificationType {
 }
 
 model User {
-  id               String    @id @default(uuid())
-  username         String?   @unique
-  email            String    @unique
-  password         String
-  confirmPassword  String?
-  firstName        String
-  lastName         String
+  id        String  @id @default(uuid())
+  username  String? @unique
+  email     String  @unique
+  password  String
+  firstName String
+  lastName  String
 
-  dateOfBirth      DateTime?
-  gender           String?
+  dateOfBirth DateTime?
+  gender      String?
 
-  avatarUrl        String?
-  bio              String?
-  location         String?
+  avatarUrl String?
+  bio       String?
+  location  String?
 
-  isOnline         Boolean   @default(false)
-  lastLogin        DateTime?
-  amountOfPosts    Int       @default(0)
+  isOnline      Boolean   @default(false)
+  lastLogin     DateTime?
+  amountOfPosts Int       @default(0)
 
-  isActive         Status    @default(ACTIVE)
-  isVerified       Boolean   @default(false) @map("is_verified")
+  isActive   Status  @default(ACTIVE)
+  isVerified Boolean @default(false) @map("is_verified")
 
-  posts            Post[]
-  comments         Comment[]
-  likes            Like[]
-  savedPosts       SavedPost[]
+  posts      Post[]
+  comments   Comment[]
+  likes      Like[]
+  savedPosts SavedPost[]
 
-  sentFriendRequests     Friendship[]  @relation("SentFriendRequests")
-  receivedFriendRequests Friendship[]  @relation("ReceivedFriendRequests")
+  sentFriendRequests     Friendship[] @relation("SentFriendRequests")
+  receivedFriendRequests Friendship[] @relation("ReceivedFriendRequests")
 
-  followers        Follow[] @relation("Followers")
-  following        Follow[] @relation("Following")
+  followers Follow[] @relation("Followers")
+  following Follow[] @relation("Following")
 
-  notifications    Notification[] @relation("UserNotifications")
+  notifications     Notification[] @relation("UserNotifications")
   sentNotifications Notification[] @relation("NotificationSender")
 
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
 
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
 model Post {
-  id            String    @id @default(uuid())
-  content       String
-  privacy       Privacy?  @default(PUBLIC)
-  photo         String?
+  id      String   @id @default(uuid())
+  content String
+  privacy Privacy? @default(PUBLIC)
+  photo   String?
 
-  userId        String
-  user          User      @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   comments      Comment[]
   likes         Like[]
@@ -102,39 +101,39 @@ model Post {
 }
 
 model Comment {
-  id          String    @id @default(uuid())
-  content     String
+  id      String @id @default(uuid())
+  content String
 
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  postId      String   
-  post        Post      @relation(fields: [postId], references: [id])
+  postId String
+  post   Post   @relation(fields: [postId], references: [id])
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  
-  likes       Like[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  likes         Like[]
   notifications Notification[]
 
   @@map("comments")
 }
 
 model Like {
-  id          String    @id @default(uuid())
-  amount      Int?
+  id     String @id @default(uuid())
+  amount Int?
 
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  postId      String?
-  post        Post?     @relation(fields: [postId], references: [id])
+  postId String?
+  post   Post?   @relation(fields: [postId], references: [id])
 
-  commentId   String?
-  comment     Comment?  @relation(fields: [commentId], references: [id])
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id])
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, postId])
   @@unique([userId, commentId])
@@ -142,91 +141,91 @@ model Like {
 }
 
 model SavedPost {
-  id          String    @id @default(uuid())
-  
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  
-  postId      String
-  post        Post      @relation(fields: [postId], references: [id])
+  id String @id @default(uuid())
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, postId])
   @@map("saved_posts")
 }
 
 model Friendship {
-  id            String       @id @default(uuid())
-  status        FriendStatus @default(PENDING)
+  id     String       @id @default(uuid())
+  status FriendStatus @default(PENDING)
 
-  senderId      String
-  sender        User         @relation("SentFriendRequests", fields: [senderId], references: [id])
+  senderId String
+  sender   User   @relation("SentFriendRequests", fields: [senderId], references: [id])
 
-  receiverId    String
-  receiver      User         @relation("ReceivedFriendRequests", fields: [receiverId], references: [id])
+  receiverId String
+  receiver   User   @relation("ReceivedFriendRequests", fields: [receiverId], references: [id])
 
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([senderId, receiverId])
   @@map("friendships")
 }
 
 model Follow {
-  id            String    @id @default(uuid())
+  id String @id @default(uuid())
 
-  followerId    String
-  follower      User      @relation("Following", fields: [followerId], references: [id])
+  followerId String
+  follower   User   @relation("Following", fields: [followerId], references: [id])
 
-  followingId   String
-  following     User      @relation("Followers", fields: [followingId], references: [id])
+  followingId String
+  following   User   @relation("Followers", fields: [followingId], references: [id])
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([followerId, followingId])
   @@map("follows")
 }
 
 model Notification {
-  id            String           @id @default(uuid())
-  type          NotificationType
-  message       String
-  isRead        Boolean          @default(false)
+  id      String           @id @default(uuid())
+  type    NotificationType
+  message String
+  isRead  Boolean          @default(false)
 
-  userId        String
-  user          User             @relation("UserNotifications", fields: [userId], references: [id])
+  userId String
+  user   User   @relation("UserNotifications", fields: [userId], references: [id])
 
-  senderId      String?
-  sender        User?            @relation("NotificationSender", fields: [senderId], references: [id])
+  senderId String?
+  sender   User?   @relation("NotificationSender", fields: [senderId], references: [id])
 
-  postId        String?
-  post          Post?            @relation(fields: [postId], references: [id])
+  postId String?
+  post   Post?   @relation(fields: [postId], references: [id])
 
-  commentId     String?
-  comment       Comment?         @relation(fields: [commentId], references: [id])
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id])
 
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("notifications")
 }
 
 model Message {
-  id          String    @id @default(uuid())
-  content     String
-  isRead      Boolean   @default(false)
+  id      String  @id @default(uuid())
+  content String
+  isRead  Boolean @default(false)
 
-  senderId    String
-  sender      User      @relation("SentMessages", fields: [senderId], references: [id])
+  senderId String
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
 
-  receiverId  String
-  receiver    User      @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiverId String
+  receiver   User   @relation("ReceivedMessages", fields: [receiverId], references: [id])
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("messages")
 }
