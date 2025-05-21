@@ -50,8 +50,8 @@ export class UserService {
 
     const user = await this.prismaService.user.create({
       data: {
-        firstName,
-        lastName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email,
         password,
       },
