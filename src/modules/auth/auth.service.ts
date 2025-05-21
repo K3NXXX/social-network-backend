@@ -7,10 +7,9 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../user/user.service';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../common/prisma.service';
-import { compare } from 'bcrypt';
 import { Response } from 'express';
 import { LoginDto, SignupDto } from './dto/auth.dto';
+import { compare } from 'bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -18,7 +17,6 @@ export class AuthService {
     private jwt: JwtService,
     private userService: UserService,
     private configService: ConfigService,
-    private prisma: PrismaService,
   ) {}
 
   async register(dto: SignupDto) {
@@ -44,14 +42,14 @@ export class AuthService {
     return { user, ...tokens };
   }
 
-  async updateTokens(refreshToken: string) {
-    const result = await this.jwt.verifyAsync(refreshToken);
-    if (!result) throw new UnauthorizedException('Invalid refresh token');
+  private async validate(dto: LoginDto) {
+    const user = await this.userService.findByEmail(dto.email);
+    if (!user) throw new NotFoundException('User not found');
 
-    const user = await this.userService.findById(result.id);
-    const tokens = this.issueTokens(user.id);
+    const isPasswordValid = await compare(dto.password, user.password);
+    if (!isPasswordValid) throw new BadRequestException('Invalid credentials');
 
-    return { user, ...tokens };
+    return user;
   }
 
   issueTokens(userId: string) {
@@ -68,14 +66,14 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private async validate(dto: LoginDto) {
-    const user = await this.userService.findByEmail(dto.email);
-    if (!user) throw new NotFoundException('User not found');
+  async refresh(refreshToken: string) {
+    const result = await this.jwt.verifyAsync(refreshToken);
+    if (!result) throw new UnauthorizedException('Invalid refresh token');
 
-    const isPasswordValid = await compare(user.password, dto.password);
-    if (!isPasswordValid) throw new BadRequestException('Invalid credentials');
+    const user = await this.userService.findById(result.id);
+    const tokens = this.issueTokens(user.id);
 
-    return user;
+    return { user, ...tokens };
   }
 
   addRefreshToken(res: Response, refreshToken: string) {
