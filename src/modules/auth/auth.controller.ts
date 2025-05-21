@@ -6,10 +6,8 @@ import {
   Post,
   Res,
 } from '@nestjs/common';
-import { AuthService } from './auth.service';
 import { LoginDto, SignupDto } from './dto/auth.dto';
 import { Response } from 'express';
-import { Controller } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
