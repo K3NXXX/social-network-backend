@@ -56,4 +56,50 @@ export class UserService {
 
     return user;
   }
+
+  public async update(
+    id: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      password?: string;
+    },
+  ) {
+    const user = await this.findById(id);
+    if (data.email && data.email !== user.email) {
+      const existingUser = await this.findByEmail(data.email);
+      if (existingUser) {
+        throw new ConflictException(`Користувач з email ${data.email} вже існує`);
+      }
+    }
+
+    let hashedPassword: string | undefined;
+    if (data.password) {
+      const salt = await genSalt(10);
+      hashedPassword = await hash(data.password, salt);
+    }
+
+    const updatedUser = await this.prismaService.user.update({
+      where: { id },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        ...(hashedPassword && { password: hashedPassword }),
+      },
+    });
+
+    return updatedUser;
+  }
+
+  public async delete(id: string) {
+    await this.findById(id);
+
+    await this.prismaService.user.delete({
+      where: { id },
+    });
+
+    return { message: 'Користувача успішно видалено' };
+  }
 }
