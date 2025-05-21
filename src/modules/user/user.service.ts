@@ -41,6 +41,8 @@ export class UserService {
 
     if (existingUser)
       throw new ConflictException(`User with email ${email} already exists`);
+    
+    if (password !== confirmPassword) throw new ConflictException('Passwords do not match');
 
     const salt = await genSalt(10);
     password = await hash(password, salt);
