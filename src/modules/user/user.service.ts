@@ -56,7 +56,6 @@ export class UserService {
 
     return user;
   }
-
   public async update(
     id: string,
     data: {
