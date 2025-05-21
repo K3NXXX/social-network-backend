@@ -8,6 +8,19 @@ export default tseslint.config(
   {
     ignores: ['eslint.config.mjs'],
   },
+<<<<<<< HEAD
+  plugins: ['@typescript-eslint', '@typescript-eslint/eslint-plugin',],
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:prettier/recommended',
+    'plugin:react/recommended',
+    'prettier'
+  ],
+  env: {
+    node: true,
+    jest: true,
+=======
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   eslintPluginPrettierRecommended,
@@ -23,6 +36,7 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+>>>>>>> 1a4a9c694734123ddd23690f782d858a48689c69
   },
   {
     rules: {
