@@ -77,6 +77,8 @@ model User {
 
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
 }
 
 model Post {
@@ -95,6 +97,8 @@ model Post {
   likes         Like[]
   savedBy       SavedPost[]
   notifications Notification[]
+
+  @@map("posts")
 }
 
 model Comment {
@@ -112,6 +116,8 @@ model Comment {
   
   likes       Like[]
   notifications Notification[]
+
+  @@map("comments")
 }
 
 model Like {
@@ -132,6 +138,7 @@ model Like {
 
   @@unique([userId, postId])
   @@unique([userId, commentId])
+  @@map("likes")
 }
 
 model SavedPost {
@@ -147,6 +154,7 @@ model SavedPost {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@unique([userId, postId])
+  @@map("saved_posts")
 }
 
 model Friendship {
@@ -163,6 +171,7 @@ model Friendship {
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
   @@unique([senderId, receiverId])
+  @@map("friendships")
 }
 
 model Follow {
@@ -178,6 +187,7 @@ model Follow {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@unique([followerId, followingId])
+  @@map("follows")
 }
 
 model Notification {
@@ -200,6 +210,8 @@ model Notification {
 
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  @@map("notifications")
 }
 
 model Message {
@@ -215,4 +227,6 @@ model Message {
 
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("messages")
 }
