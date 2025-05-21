@@ -41,16 +41,17 @@ export class UserService {
 
     if (existingUser)
       throw new ConflictException(`User with email ${email} already exists`);
-    
-    if (password !== confirmPassword) throw new ConflictException('Passwords do not match');
+
+    if (password !== confirmPassword)
+      throw new ConflictException('Passwords do not match');
 
     const salt = await genSalt(10);
     password = await hash(password, salt);
 
     const user = await this.prismaService.user.create({
       data: {
-        firstName,
-        lastName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email,
         password,
       },
