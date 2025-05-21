@@ -1,22 +1,20 @@
 import { NestFactory } from '@nestjs/core';
-import * as dotenv from 'dotenv';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
-
-dotenv.config();
+import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const config = app.get(ConfigService);
+  app.use(cookieParser());
   app.enableCors({
     origin: ['*'],
     credentials: true,
   });
   app.setGlobalPrefix('api');
-  
 
-  await app.listen(config.getOrThrow<number>("PORT"));
+  await app.listen(config.getOrThrow<number>('PORT'));
 }
 
 bootstrap();
