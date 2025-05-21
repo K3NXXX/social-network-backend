@@ -5,7 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from './common/prisma.service';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
