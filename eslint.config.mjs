@@ -5,12 +5,10 @@ module.exports = {
     ecmaVersion: 2024,
     sourceType: 'module',
   },
-  plugins: ['@typescript-eslint', 'import', '@typescript-eslint/eslint-plugin', 'unused-imports'],
+  plugins: ['@typescript-eslint', '@typescript-eslint/eslint-plugin',],
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
-    'plugin:import/errors',
-    'plugin:import/warnings',
     'plugin:prettier/recommended',
     'plugin:react/recommended',
     'prettier'

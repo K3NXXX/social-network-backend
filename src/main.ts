@@ -13,6 +13,7 @@ async function bootstrap() {
     origin: ['*'],
     credentials: true,
   });
+  app.setGlobalPrefix('api');
   
   await app.listen(config.getOrThrow<number>("PORT"));
 }
