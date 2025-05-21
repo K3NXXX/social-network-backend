@@ -7,30 +7,212 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Стасут відповідає за можливість заблокувати користувача
 enum Status {
   ACTIVE
   INACTIVE
 }
 
+// Приватність публікації
+enum Privacy {
+  PUBLIC
+  PRIVATE
+}
+
+// Статус запиту на дружбу
+enum FriendStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// Тип повідомлення
+enum NotificationType {
+  LIKE
+  COMMENT
+  FRIEND_REQUEST
+  FRIEND_ACCEPT
+  NEW_FOLLOWER
+}
+
 model User {
-  id              String  @id @default(uuid())
-  firstName       String
-  lastName        String
-  email           String  @unique
-  password        String
-  confirmPassword String?
+  id               String    @id @default(uuid())
+  username         String?   @unique
+  email            String    @unique
+  password         String
+  confirmPassword  String?
+  firstName        String
+  lastName         String
 
-  username    String?   @unique
-  dateOfBirth DateTime?
-  gender      String?
-  lastLogin   DateTime?
-  avatarUrl   String?
-  bio         String?
-  location    String?
-  isVerified  Boolean?  @default(false) @map("is_verified")
+  dateOfBirth      DateTime?
+  gender           String?
 
-  isActive Status @default(ACTIVE)
+  avatarUrl        String?
+  bio              String?
+  location         String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  isOnline         Boolean   @default(false)
+  lastLogin        DateTime?
+  amountOfPosts    Int       @default(0)
+
+  isActive         Status    @default(ACTIVE)
+  isVerified       Boolean   @default(false) @map("is_verified")
+
+  posts            Post[]
+  comments         Comment[]
+  likes            Like[]
+  savedPosts       SavedPost[]
+
+  sentFriendRequests     Friendship[]  @relation("SentFriendRequests")
+  receivedFriendRequests Friendship[]  @relation("ReceivedFriendRequests")
+
+  followers        Follow[] @relation("Followers")
+  following        Follow[] @relation("Following")
+
+  notifications    Notification[] @relation("UserNotifications")
+  sentNotifications Notification[] @relation("NotificationSender")
+
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+}
+
+model Post {
+  id            String    @id @default(uuid())
+  content       String
+  privacy       Privacy?  @default(PUBLIC)
+  photo         String?
+
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  comments      Comment[]
+  likes         Like[]
+  savedBy       SavedPost[]
+  notifications Notification[]
+}
+
+model Comment {
+  id          String    @id @default(uuid())
+  content     String
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+
+  postId      String   
+  post        Post      @relation(fields: [postId], references: [id])
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  likes       Like[]
+  notifications Notification[]
+}
+
+model Like {
+  id          String    @id @default(uuid())
+  amount      Int?
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+
+  postId      String?
+  post        Post?     @relation(fields: [postId], references: [id])
+
+  commentId   String?
+  comment     Comment?  @relation(fields: [commentId], references: [id])
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+}
+
+model SavedPost {
+  id          String    @id @default(uuid())
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  
+  postId      String
+  post        Post      @relation(fields: [postId], references: [id])
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, postId])
+}
+
+model Friendship {
+  id            String       @id @default(uuid())
+  status        FriendStatus @default(PENDING)
+
+  senderId      String
+  sender        User         @relation("SentFriendRequests", fields: [senderId], references: [id])
+
+  receiverId    String
+  receiver      User         @relation("ReceivedFriendRequests", fields: [receiverId], references: [id])
+
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@unique([senderId, receiverId])
+}
+
+model Follow {
+  id            String    @id @default(uuid())
+
+  followerId    String
+  follower      User      @relation("Following", fields: [followerId], references: [id])
+
+  followingId   String
+  following     User      @relation("Followers", fields: [followingId], references: [id])
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([followerId, followingId])
+}
+
+model Notification {
+  id            String           @id @default(uuid())
+  type          NotificationType
+  message       String
+  isRead        Boolean          @default(false)
+
+  userId        String
+  user          User             @relation("UserNotifications", fields: [userId], references: [id])
+
+  senderId      String?
+  sender        User?            @relation("NotificationSender", fields: [senderId], references: [id])
+
+  postId        String?
+  post          Post?            @relation(fields: [postId], references: [id])
+
+  commentId     String?
+  comment       Comment?         @relation(fields: [commentId], references: [id])
+
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+}
+
+model Message {
+  id          String    @id @default(uuid())
+  content     String
+  isRead      Boolean   @default(false)
+
+  senderId    String
+  sender      User      @relation("SentMessages", fields: [senderId], references: [id])
+
+  receiverId  String
+  receiver    User      @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 }
