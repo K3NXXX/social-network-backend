@@ -63,6 +63,42 @@ export class CommentService {
     return comment;
   }
 
+  async findOne(id: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+        likes: true,
+        replies: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
+              },
+            },
+            likes: true,
+          },
+        },
+      },
+    });
+
+    if (!comment) throw new NotFoundException('Comment not found');
+
+    return comment;
+  }
+
   async findAllForPost(postId: string) {
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
     if (!post) throw new NotFoundException('Post not found');
