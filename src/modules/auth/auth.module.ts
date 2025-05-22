@@ -8,6 +8,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { UserService } from '../user/user.service';
 import { getJwtConfig } from 'src/common/config/jwt.config';
 import { JwtStrategy } from '../../common/strategies/jwt.strategy';
+import { CloudinaryService } from '../cloudinary/cloudinary.service'
 
 @Module({
   imports: [
@@ -20,6 +21,6 @@ import { JwtStrategy } from '../../common/strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PrismaService, JwtStrategy, UserService],
+  providers: [AuthService, PrismaService, JwtStrategy, UserService, CloudinaryService],
 })
 export class AuthModule {}
