@@ -32,6 +32,11 @@ export class CommentController {
     return this.commentService.findReplies(id);
   }
 
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.commentService.findOne(id);
+  }
+
   @Patch(':id')
   @Authorization()
   update(

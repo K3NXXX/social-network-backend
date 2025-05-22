@@ -20,7 +20,26 @@ export class PostService {
         avatarUrl: true,
       },
     },
-    comments: true,
+    comments: {
+      select: {
+        id: true,
+        content: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+        likes: {
+          select: {
+            id: true,
+          },
+        },
+        createdAt: true,
+      },
+    },
     likes: true,
   } as const;
 
@@ -47,9 +66,8 @@ export class PostService {
       include: this.defaultPostInclude,
     });
 
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
+    if (!post) throw new NotFoundException('Post not found');
+
     return post;
   }
 
