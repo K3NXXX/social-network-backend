@@ -42,6 +42,9 @@ export class LikeService {
   }
 
   async toggleCommentLike(commentId: string, userId: string) {
+    const comment = await this.comment.findOne(commentId);
+    if (!comment) throw new Error('Comment not found');
+
     const existing = await this.prisma.like.findUnique({
       where: {
         userId_commentId: {
