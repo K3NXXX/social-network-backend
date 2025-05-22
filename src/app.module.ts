@@ -7,6 +7,8 @@ import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
 import { PostModule } from './modules/post/post.module';
+import { CommentModule } from './modules/comment/comment.module';
+import { LikeModule } from './modules/like/like.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { PostModule } from './modules/post/post.module';
     AuthModule,
     CloudinaryModule,
     PostModule,
+    CommentModule,
+    LikeModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
