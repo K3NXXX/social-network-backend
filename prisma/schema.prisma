@@ -69,7 +69,7 @@ model User {
   sentNotifications Notification[] @relation("NotificationSender")
 
   chats              Chat[]            @relation("Chats")
-  chatParticipations ChatParticipant[] @relation("ChatParticipants")
+  chatParticipations ChatParticipant[]
   sentMessages       Message[]         @relation("SentMessages")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -200,38 +200,43 @@ model Notification {
 }
 
 model Chat {
-  id        String  @id @default(uuid())
-  name      String?
-  isGroup   Boolean @default(false)
-  creatorId String?
-  creator   User?   @relation("Chats", fields: [creatorId], references: [id])
+  id      String  @id @default(uuid())
+  name    String?
+  isGroup Boolean @default(false)
+
+  creatorId String
+  creator   User   @relation("Chats", fields: [creatorId], references: [id])
 
   participants ChatParticipant[]
   messages     Message[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("chats")
 }
 
 model ChatParticipant {
   id String @id @default(uuid())
 
   userId String
-  user   User   @relation("ChatParticipants", fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   chatId String
   chat   Chat   @relation(fields: [chatId], references: [id])
 
-  joinedAt DateTime  @default(now())
+  joinedAt DateTime  @default(now()) @map("joined_at")
   leftAt   DateTime?
 
   @@unique([userId, chatId])
+  @@map("chat_participants")
 }
 
 model Message {
-  id      String  @id @default(uuid())
-  content String
-  isRead  Boolean @default(false)
+  id       String  @id @default(uuid())
+  content  String
+  imageUrl String?
+  isRead   Boolean @default(false)
 
   senderId String
   sender   User   @relation("SentMessages", fields: [senderId], references: [id])
@@ -239,6 +244,8 @@ model Message {
   chatId String
   chat   Chat   @relation(fields: [chatId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("messages")
 }
