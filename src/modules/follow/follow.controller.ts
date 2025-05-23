@@ -16,6 +16,16 @@ export class FollowController {
     return this.followService.toggleFollow(followerId, followingId);
   }
 
+  @Get('followers/:userId')
+  getFollowers(@Param('userId') userId: string) {
+    return this.followService.getFollowers(userId);
+  }
+
+  @Get('following/:userId')
+  getFollowing(@Param('userId') userId: string) {
+    return this.followService.getFollowing(userId);
+  }
+
   @Authorization()
   @Get('is-following/:followingId')
   isFollowing(
