@@ -1,37 +1,81 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreatePostDto } from './dto/post.dto';
 
 @Injectable()
 export class PostService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   private readonly defaultPostInclude = {
     user: {
       select: {
-        id: true,
         firstName: true,
         lastName: true,
         username: true,
         avatarUrl: true,
       },
     },
-    comments: true,
+    comments: {
+      select: {
+        id: true,
+        content: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+        likes: {
+          select: {
+            id: true,
+          },
+        },
+        createdAt: true,
+      },
+    },
     likes: true,
   } as const;
 
-  async create(createPostDto: CreatePostDto, userId: string) {
-    return this.prisma.post.create({
-      data: {
-        ...createPostDto,
-        userId,
-      },
-      include: this.defaultPostInclude,
-    });
+  async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
+    try {
+      let photo: string | undefined;
+      let photoPublicId: string | undefined;
+
+      if (file) {
+        try {
+          const uploadResult = await this.cloudinaryService.uploadFile(file);
+          photoPublicId = uploadResult.public_id;
+          photo = uploadResult.secure_url;
+        } catch (error) {
+          throw new BadRequestException(error);
+        }
+      }
+
+      const post = await this.prisma.post.create({
+        data: {
+          content: dto.content,
+          photoPublicId: photoPublicId,
+          photo,
+          userId,
+        },
+        include: this.defaultPostInclude,
+      });
+
+      return post;
+    } catch (error) {
+      throw new BadRequestException(error);
+    }
   }
 
   async findAll() {
@@ -47,9 +91,8 @@ export class PostService {
       include: this.defaultPostInclude,
     });
 
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
+    if (!post) throw new NotFoundException('Post not found');
+
     return post;
   }
 
@@ -66,6 +109,14 @@ export class PostService {
     if (!post) throw new NotFoundException('Post not found');
     if (post.userId !== userId)
       throw new ForbiddenException('You are not allowed to delete this post');
+
+    if (post.photoPublicId) {
+      try {
+        await this.cloudinaryService.deleteFile(post.photoPublicId);
+      } catch (error) {
+        console.error('Cloudinary delete error:', error);
+      }
+    }
 
     await this.prisma.post.delete({ where: { id } });
     return { message: 'Post deleted successfully' };

@@ -48,6 +48,7 @@ model User {
   gender      String?
 
   avatarUrl String?
+  avatarPublicId String?
   bio       String?
   location  String?
 
@@ -86,6 +87,7 @@ model Post {
   content String
   privacy Privacy? @default(PUBLIC)
   photo   String?
+  photoPublicId   String? 
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -110,6 +112,10 @@ model Comment {
 
   postId String
   post   Post   @relation(fields: [postId], references: [id])
+
+  parentId String?
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

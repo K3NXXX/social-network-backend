@@ -20,4 +20,14 @@ export class CloudinaryService {
       streamifier.createReadStream(file.buffer).pipe(uploadStream);
     });
   }
+
+   async deleteFile(publicId: string): Promise<{ result: string }> {
+    try {
+      const result = await cloudinary.uploader.destroy(publicId);
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to delete image: ${error.message}`);
+    }
+  }
+  
 }
