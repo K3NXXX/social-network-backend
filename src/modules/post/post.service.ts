@@ -18,7 +18,6 @@ export class PostService {
   private readonly defaultPostInclude = {
     user: {
       select: {
-        id: true,
         firstName: true,
         lastName: true,
         username: true,
@@ -48,24 +47,32 @@ export class PostService {
     likes: true,
   } as const;
 
-  async create(
-    createPostDto: CreatePostDto,
-    userId: string,
-    file?: Express.Multer.File,
-  ) {
-    if (!file) throw new BadRequestException('Image file is required');
+  async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
+    try {
+      let photo;
 
-    const uploadResult = await this.cloudinaryService.uploadFile(file);
-    const photo = uploadResult.secure_url;
+      if (file) {
+        try {
+          const uploadResult = await this.cloudinaryService.uploadFile(file);
+          photo = uploadResult.secure_url;
+        } catch (error) {
+          throw new BadRequestException(error);
+        }
+      }
 
-    return this.prisma.post.create({
-      data: {
-        ...createPostDto,
-        userId,
-        photo
-      },
-      include: this.defaultPostInclude,
-    });
+      const post = await this.prisma.post.create({
+        data: {
+          content: dto.content,
+          photo,
+          userId,
+        },
+        include: this.defaultPostInclude,
+      });
+
+      return post;
+    } catch (error) {
+      throw new BadRequestException(error);
+    }
   }
 
   async findAll() {
