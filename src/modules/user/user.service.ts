@@ -114,10 +114,11 @@ export class UserService {
 
     const uploadResult = await this.cloudinaryService.uploadFile(file);
     const avatarUrl = uploadResult.secure_url;
+    const avatarPublicId = uploadResult.public_id;
 
     const updatedUser = await this.prismaService.user.update({
       where: { id: userId },
-      data: { avatarUrl },
+      data: { avatarUrl, avatarPublicId: avatarPublicId },
     });
 
     return updatedUser;
@@ -129,9 +130,17 @@ export class UserService {
     });
     if (!user) throw new NotFoundException('User not found');
 
+    if (user.avatarPublicId) {
+      try {
+        await this.cloudinaryService.deleteFile(user.avatarPublicId);
+      } catch (error) {
+        console.error('Cloudinary delete error:', error);
+      }
+    }
+
     const updatedUser = await this.prismaService.user.update({
       where: { id: userId },
-      data: { avatarUrl: null },
+      data: { avatarUrl: null, avatarPublicId: null },
     });
 
     return updatedUser;

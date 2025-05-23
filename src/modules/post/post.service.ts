@@ -49,11 +49,13 @@ export class PostService {
 
   async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
     try {
-      let photo;
+      let photo: string | undefined;
+      let photoPublicId: string | undefined;
 
       if (file) {
         try {
           const uploadResult = await this.cloudinaryService.uploadFile(file);
+          photoPublicId = uploadResult.public_id;
           photo = uploadResult.secure_url;
         } catch (error) {
           throw new BadRequestException(error);
@@ -63,6 +65,7 @@ export class PostService {
       const post = await this.prisma.post.create({
         data: {
           content: dto.content,
+          photoPublicId: photoPublicId,
           photo,
           userId,
         },
@@ -106,6 +109,14 @@ export class PostService {
     if (!post) throw new NotFoundException('Post not found');
     if (post.userId !== userId)
       throw new ForbiddenException('You are not allowed to delete this post');
+
+    if (post.photoPublicId) {
+      try {
+        await this.cloudinaryService.deleteFile(post.photoPublicId);
+      } catch (error) {
+        console.error('Cloudinary delete error:', error);
+      }
+    }
 
     await this.prisma.post.delete({ where: { id } });
     return { message: 'Post deleted successfully' };
