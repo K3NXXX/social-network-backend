@@ -7,26 +7,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Status is responsible for the ability to block a user
+// Стасут відповідає за можливість заблокувати користувача
 enum Status {
   ACTIVE
   INACTIVE
 }
 
-// Post privacy setting
+// Приватність публікації
 enum Privacy {
   PUBLIC
   PRIVATE
 }
 
-// Friend request status
+// Статус запиту на дружбу
 enum FriendStatus {
   PENDING
   ACCEPTED
   REJECTED
 }
 
-// Notification type
+// Тип повідомлення
 enum NotificationType {
   LIKE
   COMMENT
@@ -35,7 +35,6 @@ enum NotificationType {
   NEW_FOLLOWER
 }
 
-// Rest of the schema remains unchanged since it was already in English
 model User {
   id        String  @id @default(uuid())
   username  String? @unique
@@ -110,10 +109,6 @@ model Comment {
 
   postId String
   post   Post   @relation(fields: [postId], references: [id])
-
-  parentId String?
-  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
-  replies  Comment[] @relation("CommentReplies")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

@@ -5,11 +5,6 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from './common/prisma.service';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
-import { PostModule } from './modules/post/post.module';
-import { CommentModule } from './modules/comment/comment.module';
-import { LikeModule } from './modules/like/like.module';
-import { FollowModule } from './modules/follow/follow.module';
 
 @Module({
   imports: [
@@ -18,11 +13,6 @@ import { FollowModule } from './modules/follow/follow.module';
     }),
     UserModule,
     AuthModule,
-    CloudinaryModule,
-    PostModule,
-    CommentModule,
-    LikeModule,
-    FollowModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
