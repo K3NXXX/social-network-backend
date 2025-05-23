@@ -9,6 +9,7 @@ import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
 import { PostModule } from './modules/post/post.module';
 import { CommentModule } from './modules/comment/comment.module';
 import { LikeModule } from './modules/like/like.module';
+import { FollowModule } from './modules/follow/follow.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { LikeModule } from './modules/like/like.module';
     PostModule,
     CommentModule,
     LikeModule,
+    FollowModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
