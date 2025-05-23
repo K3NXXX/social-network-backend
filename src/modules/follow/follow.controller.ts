@@ -3,12 +3,12 @@ import { FollowService } from './follow.service';
 import { Authorization } from '../../common/decorators/auth.decorator';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 
-@Controller('follow')
+@Controller()
 export class FollowController {
   constructor(private readonly followService: FollowService) {}
 
   @Authorization()
-  @Post(':followingId')
+  @Post('follow/:followingId')
   toggleFollow(
     @CurrentUser('id') followerId: string,
     @Param('followingId') followingId: string,
