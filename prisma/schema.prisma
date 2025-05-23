@@ -48,6 +48,7 @@ model User {
   gender      String?
 
   avatarUrl String?
+  avatarPublicId String?
   bio       String?
   location  String?
 
@@ -86,6 +87,7 @@ model Post {
   content String
   privacy Privacy? @default(PUBLIC)
   photo   String?
+  photoPublicId   String? 
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
