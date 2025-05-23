@@ -1,14 +1,19 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreatePostDto } from './dto/post.dto';
 
 @Injectable()
 export class PostService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   private readonly defaultPostInclude = {
     user: {
@@ -43,11 +48,21 @@ export class PostService {
     likes: true,
   } as const;
 
-  async create(createPostDto: CreatePostDto, userId: string) {
+  async create(
+    createPostDto: CreatePostDto,
+    userId: string,
+    file?: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Image file is required');
+
+    const uploadResult = await this.cloudinaryService.uploadFile(file);
+    const photo = uploadResult.secure_url;
+
     return this.prisma.post.create({
       data: {
         ...createPostDto,
         userId,
+        photo
       },
       include: this.defaultPostInclude,
     });

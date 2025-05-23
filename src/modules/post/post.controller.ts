@@ -1,8 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { PostService } from './post.service';
-import { CreatePostDto } from './dto/post.dto';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Authorization } from '../../common/decorators/auth.decorator';
 import { CurrentUser } from '../../common/decorators/user.decorator';
+import { CreatePostDto } from './dto/post.dto';
+import { PostService } from './post.service';
 
 @Controller('posts')
 export class PostController {
@@ -10,11 +20,13 @@ export class PostController {
 
   @Post()
   @Authorization()
+  @UseInterceptors(FileInterceptor('file'))
   create(
     @Body() createPostDto: CreatePostDto,
     @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.postService.create(createPostDto, userId);
+    return this.postService.create(createPostDto, userId, file);
   }
 
   @Get()
