@@ -42,42 +42,6 @@ export class FollowService {
     return { following: true };
   }
 
-  async getFollowers(userId: string) {
-    return this.prisma.follow.findMany({
-      where: { followingId: userId },
-      select: {
-        follower: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        createdAt: true,
-      },
-    });
-  }
-
-  async getFollowing(userId: string) {
-    return this.prisma.follow.findMany({
-      where: { followerId: userId },
-      select: {
-        following: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        createdAt: true,
-      },
-    });
-  }
-
   async isFollowing(userId: string, followingId: string) {
     const existing = await this.prisma.follow.findUnique({
       where: {
