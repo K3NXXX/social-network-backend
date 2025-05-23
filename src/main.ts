@@ -11,7 +11,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.use(cookieParser());
   app.enableCors({
-    origin: ['*'],
+    origin: ['http://localhost:5173'],
     credentials: true,
   });
   app.useGlobalPipes(
