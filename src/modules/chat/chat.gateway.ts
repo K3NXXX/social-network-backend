@@ -13,18 +13,17 @@ import { JwtService } from '@nestjs/jwt';
 import { MessageService } from './message/message.service';
 import { ConfigService } from '@nestjs/config';
 import { MessageDto } from './message/dto/message.dto';
+import { ChatService } from './chat.service';
 
 @WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
+  cors: true,
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  @WebSocketServer()
-  server: Server;
+  @WebSocketServer() server: Server;
 
   constructor(
     private messageService: MessageService,
+    private chatService: ChatService,
     private jwt: JwtService,
     private configService: ConfigService,
   ) {}
@@ -52,34 +51,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('join_chat')
-  handleJoinChat(
+  handleJoinRoom(
     @MessageBody() chatId: string,
-    @ConnectedSocket() socket: Socket,
+    @ConnectedSocket() client: Socket,
   ) {
-    socket.join(`chat:${chatId}`);
-    console.log(`User ${socket.data.user.id} joined chat:${chatId}`);
+    client.join(chatId);
+    console.log(`Joined room ${chatId}`);
   }
 
   @SubscribeMessage('leave_chat')
   handleLeaveChat(
     @MessageBody() chatId: string,
-    @ConnectedSocket() socket: Socket,
+    @ConnectedSocket() client: Socket,
   ) {
-    socket.leave(`chat:${chatId}`);
-    console.log(`User ${socket.data.user.id} left chat:${chatId}`);
+    client.leave(chatId);
+    console.log(`User ${client.data.user.id} left chat:${chatId}`);
   }
 
-  @SubscribeMessage('send_message')
-  async handleSendMessage(
-    @MessageBody() dto: MessageDto,
-    @ConnectedSocket() socket: Socket,
-  ) {
-    const userId = socket.data.user.id;
+  @SubscribeMessage('newMessage')
+  async handleSendMessage(@MessageBody() dto: MessageDto) {
+    const message = await this.messageService.sendMessage(dto);
+    const chat = await this.chatService.getChatByMessageId(message.id);
 
-    const message = await this.messageService.sendMessage(userId, dto);
-
-    this.server.to(`chat:${message.chat.id}`).emit('new_message', message);
-
-    return message;
+    this.server.to(chat?.id as string).emit('message', message);
   }
 }
