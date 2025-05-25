@@ -10,8 +10,8 @@ import { PostModule } from './modules/post/post.module';
 import { CommentModule } from './modules/comment/comment.module';
 import { LikeModule } from './modules/like/like.module';
 import { FollowModule } from './modules/follow/follow.module';
+import { BlockUserModule } from './modules/block-user/block-user.module';
 import { NotificationModule } from './modules/notification/notification.module';
-
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -25,6 +25,7 @@ import { NotificationModule } from './modules/notification/notification.module';
     LikeModule,
     FollowModule,
     NotificationModule,
+    BlockUserModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
