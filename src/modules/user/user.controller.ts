@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Param,
   Patch,
   UploadedFile,
   UseInterceptors,
@@ -13,6 +14,7 @@ import { CurrentUser } from 'src/common/decorators/user.decorator';
 import { UpdateUserDto } from './dto/user.dto';
 import { UserService } from './user.service';
 import { FollowService } from '../follow/follow.service';
+import { CheckBlocked } from '../../common/decorators/block-user.decorator';
 
 @Controller('user')
 export class UserController {
@@ -25,6 +27,13 @@ export class UserController {
   @Get()
   async getProfile(@CurrentUser('id') userId: string) {
     return this.userService.findById(userId);
+  }
+
+  @CheckBlocked()
+  @Authorization()
+  @Get('/profile/:id')
+  async getUserProfile(@Param('id') id: string) {
+    return this.userService.getProfile(id);
   }
 
   @Authorization()
@@ -42,14 +51,14 @@ export class UserController {
   @Authorization()
   @Patch('update')
   async updateUser(
-    @Body() updateUserDto: UpdateUserDto,
+    @Body() dto: UpdateUserDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.userService.update(updateUserDto, userId);
+    return this.userService.update(dto, userId);
   }
 
   @Authorization()
-  @Patch('uploadAvatar')
+  @Patch('update/avatar')
   @UseInterceptors(FileInterceptor('file'))
   async uploadAvatar(
     @UploadedFile() file: Express.Multer.File,
@@ -59,7 +68,7 @@ export class UserController {
   }
 
   @Authorization()
-  @Delete('deleteAvatar')
+  @Delete('delete/avatar')
   async deleteAvatar(@CurrentUser('id') userId: string) {
     return this.userService.deleteAvatar(userId);
   }

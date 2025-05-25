@@ -5,25 +5,25 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { BlockUserService } from '../../modules/block-user/block-user.service';
-import { User } from '@prisma/client';
 
 @Injectable()
-export class BlockedUsersGuard implements CanActivate {
+export class CheckBlockedGuard implements CanActivate {
   constructor(private readonly blockedUserService: BlockUserService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const currentUser: User = request.user;
-    const targetUserId = request.params.id || request.body.userId;
+    const currentUser = request.user;
+    const blockedId = request.params.id;
 
-    if (!currentUser || !targetUserId || currentUser.id === targetUserId)
-      return true;
+    if (!currentUser) return true;
 
     const isBlocked = await this.blockedUserService.isBlocked(
+      blockedId,
       currentUser.id,
-      targetUserId,
     );
-    if (isBlocked) throw new ForbiddenException('Blocked user interaction');
+
+    if (isBlocked)
+      throw new ForbiddenException('You have been blocked by this user');
 
     return true;
   }

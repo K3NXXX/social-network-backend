@@ -39,15 +39,16 @@ export class BlockUserService {
   }
 
   async isBlocked(blockerId: string, blockedId: string): Promise<boolean> {
-    const blocked = await this.prisma.blockedUser.findFirst({
+    const result = await this.prisma.blockedUser.findUnique({
       where: {
-        OR: [
-          { blockerId, blockedId },
-          { blockedId, blockerId },
-        ],
+        blockerId_blockedId: {
+          blockerId,
+          blockedId,
+        },
       },
     });
-    return !!blocked;
+
+    return !!result;
   }
 
   async getBlockedUsers(userId: string) {

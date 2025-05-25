@@ -1,6 +1,6 @@
-import { UseGuards } from '@nestjs/common';
-import { BlockedUsersGuard } from '../guards/block.guard';
+import { applyDecorators, UseGuards } from '@nestjs/common';
+import { CheckBlockedGuard } from '../guards/block.guard';
 
-export const CheckBlocked = () => {
-  return UseGuards(BlockedUsersGuard);
-};
+export function CheckBlocked() {
+  return applyDecorators(UseGuards(CheckBlockedGuard));
+}
