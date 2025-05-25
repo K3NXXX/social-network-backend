@@ -15,18 +15,45 @@ export class NotificationService {
     });
   }
 
-  async getUserNotifications(userId: string) {
-    return this.prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        sender: true,
-        post: true,
-        like: true,
-        comment: true,
+ async getUserNotifications(userId: string) {
+  return this.prisma.notification.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      type: true,
+      message: true,
+      isRead: true,
+      createdAt: true,
+      sender: {
+        select: {
+          id: true,
+          username: true,
+          firstName: true,
+          lastName: true
+        },
       },
-    });
-  }
+      post: {
+        select: {
+          id: true,
+          content: true,
+          photo: true,
+        },
+      },
+      like: {
+        select: {
+          id: true,
+        },
+      },
+      comment: {
+        select: {
+          id: true,
+        },
+      },
+    },
+  });
+}
+
 
   async markAsRead(notificationId: string) {
     return this.prisma.notification.update({
