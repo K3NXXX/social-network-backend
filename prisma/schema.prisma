@@ -1,6 +1,5 @@
 generator client {
-  provider       = "prisma-client-js"
-  reviewFeatures = ["pgBouncer"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
