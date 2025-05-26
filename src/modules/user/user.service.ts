@@ -39,7 +39,6 @@ export class UserService {
     lastName: string,
     email: string,
     password: string,
-    confirmPassword: string,
   ) {
     const existingUser = await this.prismaService.user.findUnique({
       where: { email },
@@ -47,9 +46,6 @@ export class UserService {
 
     if (existingUser)
       throw new ConflictException(`User with email ${email} already exists`);
-
-    if (password !== confirmPassword)
-      throw new ConflictException('Passwords do not match');
 
     const salt = await genSalt(10);
     password = await hash(password, salt);
@@ -69,11 +65,7 @@ export class UserService {
   public async update(updateUserDto: UpdateUserDto, userId: string) {
     const { currentPassword, newPassword, email, ...otherData } = updateUserDto;
 
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.findById(userId);
 
     const isPasswordValid = await compare(currentPassword, user.password);
     if (!isPasswordValid)
@@ -105,10 +97,7 @@ export class UserService {
   }
 
   public async uploadAvatar(file: Express.Multer.File, userId: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.findById(userId);
 
     if (!file) throw new BadRequestException('File is required');
 
@@ -117,7 +106,7 @@ export class UserService {
     const avatarPublicId = uploadResult.public_id;
 
     const updatedUser = await this.prismaService.user.update({
-      where: { id: userId },
+      where: { id: user.id },
       data: { avatarUrl, avatarPublicId: avatarPublicId },
     });
 
@@ -125,10 +114,7 @@ export class UserService {
   }
 
   public async deleteAvatar(userId: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.findById(userId);
 
     if (user.avatarPublicId) {
       try {
@@ -144,5 +130,31 @@ export class UserService {
     });
 
     return updatedUser;
+  }
+
+  public async search(query: string) {
+    if (!query?.trim()) return false;
+
+    const normalizedQuery = query.trim().toLowerCase();
+
+    const users = await this.prismaService.user.findMany({
+      where: {
+        OR: [
+          { firstName: { contains: normalizedQuery, mode: 'insensitive' } },
+          { lastName: { contains: normalizedQuery, mode: 'insensitive' } },
+          { username: { contains: normalizedQuery, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        username: true,
+        avatarUrl: true,
+      },
+      orderBy: { firstName: 'asc' },
+    });
+
+    return users;
   }
 }
