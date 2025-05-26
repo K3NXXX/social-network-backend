@@ -1,10 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider       = "prisma-client-js"
+  reviewFeatures = ["pgBouncer"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE")
 }
 
 enum Gender {
