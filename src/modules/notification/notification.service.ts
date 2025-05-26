@@ -40,16 +40,6 @@ export class NotificationService {
           photo: true,
         },
       },
-      like: {
-        select: {
-          id: true,
-        },
-      },
-      comment: {
-        select: {
-          id: true,
-        },
-      },
     },
   });
 }

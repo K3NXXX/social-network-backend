@@ -1,9 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '@prisma/client'
 
 @Injectable()
 export class FollowService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notification: NotificationService,
+  ) {}
 
   async toggleFollow(followerId: string, followingId: string) {
     if (followerId === followingId)
@@ -37,6 +42,23 @@ export class FollowService {
         followerId,
         followingId,
       },
+    });
+
+    const sender = await this.prisma.user.findUnique({
+      where: { id: followerId },
+      select: { username: true, firstName: true, lastName: true },
+    });
+
+    const username = sender?.username
+      ? sender.username
+      : ((sender?.firstName ?? '') + ' ' + (sender?.lastName ?? '')).trim() ||
+        'Someone';
+
+    await this.notification.create({
+      type: NotificationType.NEW_FOLLOWER,
+      message: `${username} followed you`,
+      userId: followingId,
+      senderId: followerId,
     });
 
     return { following: true };
