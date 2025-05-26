@@ -11,7 +11,7 @@ import { CommentModule } from './modules/comment/comment.module';
 import { LikeModule } from './modules/like/like.module';
 import { FollowModule } from './modules/follow/follow.module';
 import { BlockUserModule } from './modules/block-user/block-user.module';
-
+import { NotificationModule } from './modules/notification/notification.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,6 +24,7 @@ import { BlockUserModule } from './modules/block-user/block-user.module';
     CommentModule,
     LikeModule,
     FollowModule,
+    NotificationModule,
     BlockUserModule,
   ],
   controllers: [AppController],

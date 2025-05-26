@@ -4,8 +4,10 @@ import { PrismaService } from 'src/common/prisma.service';
 import { UserController } from './user.controller';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { FollowService } from '../follow/follow.service';
+import { NotificationModule } from '../notification/notification.module'
 
 @Module({
+  imports: [NotificationModule],
   controllers: [UserController],
   providers: [UserService, PrismaService, CloudinaryService, FollowService],
 })

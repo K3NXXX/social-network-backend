@@ -1,9 +1,16 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationsGateway } from '../notification/notifications.gateway';
 
 @Injectable()
 export class FollowService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notification: NotificationService,
+    private readonly notificationsGateway: NotificationsGateway,
+  ) {}
 
   async toggleFollow(followerId: string, followingId: string) {
     if (followerId === followingId)
@@ -37,6 +44,29 @@ export class FollowService {
         followerId,
         followingId,
       },
+    });
+
+    const sender = await this.prisma.user.findUnique({
+      where: { id: followerId },
+      select: { username: true, firstName: true, lastName: true },
+    });
+
+    const username = sender?.username
+      ? sender.username
+      : ((sender?.firstName ?? '') + ' ' + (sender?.lastName ?? '')).trim() ||
+        'Someone';
+
+    await this.notification.create({
+      type: NotificationType.NEW_FOLLOWER,
+      message: `${username} followed you`,
+      userId: followingId,
+      senderId: followerId,
+    });
+
+    this.notificationsGateway.sendNotification(followingId, {
+      type: NotificationType.LIKE,
+      message: `${username} liked your post`,
+      senderId: followerId,
     });
 
     return { following: true };

@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
-import { PostService } from '../post/post.service';
 import { CommentService } from '../comment/comment.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationsGateway } from '../notification/notifications.gateway';
+import { PostService } from '../post/post.service';
 
 @Injectable()
 export class LikeService {
@@ -9,6 +12,8 @@ export class LikeService {
     private readonly prisma: PrismaService,
     private readonly post: PostService,
     private readonly comment: CommentService,
+    private readonly notification: NotificationService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   async togglePostLike(postId: string, userId: string) {
@@ -31,12 +36,40 @@ export class LikeService {
       return { liked: false };
     }
 
-    await this.prisma.like.create({
+    const like = await this.prisma.like.create({
       data: {
         postId,
         userId,
       },
     });
+
+    if (post.userId !== userId) {
+      const sender = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { username: true, firstName: true, lastName: true },
+      });
+
+      const username = sender?.username
+        ? sender.username
+        : ((sender?.firstName ?? '') + ' ' + (sender?.lastName ?? '')).trim() ||
+          'Someone';
+
+      await this.notification.create({
+        type: NotificationType.LIKE,
+        message: `${username} liked your post`,
+        userId: post.userId,
+        senderId: userId,
+        postId,
+        likeId: like.id,
+      });
+
+      this.notificationsGateway.sendNotification(post.userId, {
+        type: NotificationType.LIKE,
+        message: `${username} liked your post`,
+        postId,
+        senderId: userId,
+      });
+    }
 
     return { liked: true };
   }

@@ -4,12 +4,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationsGateway } from '../notification/notifications.gateway';
 import { CommentDto } from './dto/comment.dto';
 
 @Injectable()
 export class CommentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notification: NotificationService,
+    private readonly notificationsGateway: NotificationsGateway,
+  ) {}
 
   async create(dto: CommentDto, userId: string) {
     const { postId, content, parentId } = dto;
@@ -59,6 +66,34 @@ export class CommentService {
         },
       },
     });
+
+    if (post.userId !== userId) {
+      const sender = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { username: true, firstName: true, lastName: true },
+      });
+
+      const username = sender?.username
+        ? sender.username
+        : ((sender?.firstName ?? '') + ' ' + (sender?.lastName ?? '')).trim() ||
+          'Someone';
+
+      await this.notification.create({
+        type: NotificationType.COMMENT,
+        message: `${username} commented your post`,
+        userId: post.userId,
+        senderId: userId,
+        postId,
+        commentId: comment.id,
+      });
+
+      this.notificationsGateway.sendNotification(post.userId, {
+        type: NotificationType.COMMENT,
+        message: `${username} commented your post`,
+        postId,
+        senderId: userId,
+      });
+    }
 
     return comment;
   }

@@ -156,6 +156,8 @@ model Like {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  notifications Notification[]
+
   @@unique([userId, postId])
   @@unique([userId, commentId])
   @@map("likes")
@@ -207,6 +209,9 @@ model Notification {
 
   postId String?
   post   Post?   @relation(fields: [postId], references: [id])
+
+  likeId String?
+  like   Like?   @relation(fields: [likeId], references: [id])
 
   commentId String?
   comment   Comment? @relation(fields: [commentId], references: [id])
