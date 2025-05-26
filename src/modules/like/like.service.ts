@@ -3,6 +3,7 @@ import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { CommentService } from '../comment/comment.service';
 import { NotificationService } from '../notification/notification.service';
+import { NotificationsGateway } from '../notification/notifications.gateway';
 import { PostService } from '../post/post.service';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class LikeService {
     private readonly post: PostService,
     private readonly comment: CommentService,
     private readonly notification: NotificationService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   async togglePostLike(postId: string, userId: string) {
@@ -55,10 +57,17 @@ export class LikeService {
       await this.notification.create({
         type: NotificationType.LIKE,
         message: `${username} liked your post`,
-        userId: post.userId, 
-        senderId: userId, 
+        userId: post.userId,
+        senderId: userId,
         postId,
         likeId: like.id,
+      });
+
+      this.notificationsGateway.sendNotification(post.userId, {
+        type: NotificationType.LIKE,
+        message: `${username} liked your post`,
+        postId,
+        senderId: userId,
       });
     }
 

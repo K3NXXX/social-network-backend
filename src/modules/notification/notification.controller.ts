@@ -9,4 +9,10 @@ export class NotificationController {
   getForUser(@Param('userId') userId: string) {
     return this.notificationService.getUserNotifications(userId);
   }
+
+  @Get('readAll')
+  async markAllAsRead(@Param('userId') userId: string) {
+    await this.notificationService.markAllAsRead(userId);
+    return { success: true };
+  }
 }

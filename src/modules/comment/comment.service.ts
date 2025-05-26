@@ -4,16 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { NotificationService } from '../notification/notification.service';
+import { NotificationsGateway } from '../notification/notifications.gateway';
 import { CommentDto } from './dto/comment.dto';
-import { NotificationType } from '@prisma/client'
 
 @Injectable()
 export class CommentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notification: NotificationService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   async create(dto: CommentDto, userId: string) {
@@ -83,6 +85,13 @@ export class CommentService {
         senderId: userId,
         postId,
         commentId: comment.id,
+      });
+
+      this.notificationsGateway.sendNotification(post.userId, {
+        type: NotificationType.COMMENT,
+        message: `${username} commented your post`,
+        postId,
+        senderId: userId,
       });
     }
 

@@ -1,13 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { NotificationService } from '../notification/notification.service';
-import { NotificationType } from '@prisma/client'
+import { NotificationsGateway } from '../notification/notifications.gateway';
 
 @Injectable()
 export class FollowService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notification: NotificationService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   async toggleFollow(followerId: string, followingId: string) {
@@ -58,6 +60,12 @@ export class FollowService {
       type: NotificationType.NEW_FOLLOWER,
       message: `${username} followed you`,
       userId: followingId,
+      senderId: followerId,
+    });
+
+    this.notificationsGateway.sendNotification(followingId, {
+      type: NotificationType.LIKE,
+      message: `${username} liked your post`,
       senderId: followerId,
     });
 

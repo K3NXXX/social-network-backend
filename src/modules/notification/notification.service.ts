@@ -30,7 +30,8 @@ export class NotificationService {
           id: true,
           username: true,
           firstName: true,
-          lastName: true
+          lastName: true,
+          avatarUrl: true
         },
       },
       post: {
@@ -45,10 +46,15 @@ export class NotificationService {
 }
 
 
-  async markAsRead(notificationId: string) {
-    return this.prisma.notification.update({
-      where: { id: notificationId },
-      data: { isRead: true },
-    });
-  }
+async markAllAsRead(userId: string) {
+  return this.prisma.notification.updateMany({
+    where: {
+      userId,
+      isRead: false,
+    },
+    data: {
+      isRead: true,
+    },
+  });
+}
 }
