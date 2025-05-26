@@ -1,17 +1,21 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { NotificationService } from './notification.service';
+import { CurrentUser } from '../../common/decorators/user.decorator';
+import { Authorization } from '../../common/decorators/auth.decorator';
 
-@Controller('notifications')
+@Controller('user')
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
-  @Get('user/:userId')
-  getForUser(@Param('userId') userId: string) {
+  @Authorization()
+  @Get('notifications')
+  getForUser(@CurrentUser('id') userId: string) {
     return this.notificationService.getUserNotifications(userId);
   }
 
-  @Get('readAll')
-  async markAllAsRead(@Param('userId') userId: string) {
+  @Authorization()
+  @Get('notifications/readAll')
+  async markAllAsRead(@CurrentUser('id') userId: string) {
     await this.notificationService.markAllAsRead(userId);
     return { success: true };
   }

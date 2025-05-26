@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE")
 }
 
 enum Gender {
@@ -211,7 +211,7 @@ model Notification {
   post   Post?   @relation(fields: [postId], references: [id])
 
   likeId String?
-  like   Like?   @relation(fields: [likeId], references: [id]) 
+  like   Like?   @relation(fields: [likeId], references: [id])
 
   commentId String?
   comment   Comment? @relation(fields: [commentId], references: [id])
