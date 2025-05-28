@@ -249,7 +249,7 @@ model ChatParticipant {
   chat   Chat   @relation(fields: [chatId], references: [id])
 
   joinedAt DateTime  @default(now()) @map("joined_at")
-  leftAt   DateTime?
+  leftAt   DateTime? @map("left_at")
 
   @@unique([userId, chatId])
   @@map("chat_participants")

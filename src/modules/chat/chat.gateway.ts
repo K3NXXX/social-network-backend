@@ -8,78 +8,191 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-
 import { JwtService } from '@nestjs/jwt';
-import { MessageService } from './message/message.service';
 import { ConfigService } from '@nestjs/config';
+import { InternalServerErrorException, Logger } from '@nestjs/common';
+import { MessageService } from './message/message.service';
 import { MessageDto } from './message/dto/message.dto';
+import { UserService } from '../user/user.service';
 
-@WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
-})
+export enum ChatEvents {
+  JoinChat = 'join_chat',
+  LeaveChat = 'leave_chat',
+  NewMessage = 'newMessage',
+  Message = 'message',
+  Error = 'error',
+  ChatCreated = 'chat_created',
+  MessageSeen = 'message_seen',
+  UserOnline = 'user_online',
+  UserOffline = 'user_offline',
+}
+
+@WebSocketGateway({ cors: true })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  @WebSocketServer()
-  server: Server;
+  @WebSocketServer() server: Server;
+
+  private userSockets = new Map<string, Set<string>>();
+
+  private logger = new Logger(ChatGateway.name);
 
   constructor(
-    private messageService: MessageService,
-    private jwt: JwtService,
-    private configService: ConfigService,
+    private readonly messageService: MessageService,
+    private readonly userService: UserService,
+    private readonly jwt: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async handleConnection(client: Socket) {
-    const token =
-      client.handshake.auth?.token ||
-      client.handshake.headers['authorization']?.split(' ')[1];
-    if (!token) throw new Error('Missing token');
     try {
-      const payload = this.jwt.verify(token, {
+      const authHeader = client.handshake.headers['authorization'];
+      const token =
+        client.handshake.auth?.token ||
+        (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+
+      if (!token) {
+        client.emit(ChatEvents.Error, { message: 'Unauthorized' });
+        client.disconnect();
+        return;
+      }
+
+      const payload = await this.jwt.verify(token, {
         secret: this.configService.getOrThrow<string>('JWT_SECRET'),
       });
 
-      client.data.user = { id: payload.sub || payload.id };
-      console.log(`Connected user: ${payload.id}`);
+      const userId = payload.sub || payload.id;
+      client.data.user = { id: userId };
+
+      const userSocketSet = this.userSockets.get(userId) ?? new Set();
+      userSocketSet.add(client.id);
+      this.userSockets.set(userId, userSocketSet);
+
+      const wasOnline = await this.userService.isUserOnline(userId);
+      await this.userService.setUserOnline(userId);
+
+      if (!wasOnline) {
+        await this.userService.updateLastLogin(userId);
+        this.server.emit(ChatEvents.UserOnline, { userId });
+      }
+
+      this.logger.log(`User connected: ${userId}`);
     } catch (err) {
-      console.log('Socket auth failed:', err.message);
+      this.logger.warn(`Socket auth failed: ${err.message}`);
+      client.emit(ChatEvents.Error, { message: 'Unauthorized' });
       client.disconnect();
     }
   }
 
-  handleDisconnect(socket: Socket) {
-    console.log(`User disconnected: ${socket.data.user?.id}`);
+  async handleDisconnect(client: Socket) {
+    for (const [userId, socketIds] of this.userSockets.entries()) {
+      if (socketIds.has(client.id)) {
+        socketIds.delete(client.id);
+
+        if (socketIds.size === 0) {
+          this.userSockets.delete(userId);
+          await this.userService.setUserOffline(userId);
+          this.server.emit(ChatEvents.UserOffline, { userId });
+        }
+
+        this.logger.log(`User disconnected: ${userId}`);
+        break;
+      }
+    }
   }
 
-  @SubscribeMessage('join_chat')
-  handleJoinChat(
+  @SubscribeMessage(ChatEvents.JoinChat)
+  async handleJoinChat(
     @MessageBody() chatId: string,
-    @ConnectedSocket() socket: Socket,
+    @ConnectedSocket() client: Socket,
   ) {
-    socket.join(`chat:${chatId}`);
-    console.log(`User ${socket.data.user.id} joined chat:${chatId}`);
+    client.join(chatId);
   }
 
-  @SubscribeMessage('leave_chat')
-  handleLeaveChat(
+  @SubscribeMessage(ChatEvents.LeaveChat)
+  async handleLeaveChat(
     @MessageBody() chatId: string,
-    @ConnectedSocket() socket: Socket,
+    @ConnectedSocket() client: Socket,
   ) {
-    socket.leave(`chat:${chatId}`);
-    console.log(`User ${socket.data.user.id} left chat:${chatId}`);
+    client.leave(chatId);
   }
 
-  @SubscribeMessage('send_message')
+  @SubscribeMessage(ChatEvents.NewMessage)
   async handleSendMessage(
     @MessageBody() dto: MessageDto,
-    @ConnectedSocket() socket: Socket,
+    @ConnectedSocket() client: Socket,
   ) {
-    const userId = socket.data.user.id;
+    try {
+      const senderId = client.data.user?.id;
+      if (!senderId)
+        throw new InternalServerErrorException('User ID not found in socket');
 
-    const message = await this.messageService.sendMessage(userId, dto);
+      const message = await this.messageService.sendMessage(senderId, dto);
 
-    this.server.to(`chat:${message.chat.id}`).emit('new_message', message);
+      const chatId = message.chat?.id;
+      if (!chatId)
+        throw new InternalServerErrorException('Chat ID missing in message');
 
-    return message;
+      if (message.isNewChat) {
+        client.emit(ChatEvents.ChatCreated, chatId);
+
+        const receiverId = dto.receiverId;
+        if (!receiverId)
+          throw new InternalServerErrorException('Receiver ID is missing');
+
+        const receiverSocketIds = this.userSockets.get(receiverId) ?? new Set();
+        for (const id of receiverSocketIds) {
+          const sock = this.server.sockets.sockets.get(id);
+          if (sock) {
+            sock.join(chatId);
+            sock.emit(ChatEvents.ChatCreated, chatId);
+          }
+        }
+      }
+
+      this.server.to(chatId).emit(ChatEvents.Message, {
+        ...message,
+        chatId,
+      });
+    } catch (err) {
+      this.logger.error(`Send message error: ${err.message}`);
+      client.emit(ChatEvents.Error, { message: err.message });
+    }
+  }
+
+  @SubscribeMessage(ChatEvents.MessageSeen)
+  async handleMessageSeen(
+    @MessageBody() data: { messageId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      const userId = client.data.user?.id;
+      if (!userId)
+        throw new InternalServerErrorException('User not found in socket');
+
+      if (!data?.messageId) {
+        client.emit(ChatEvents.Error, { message: 'Message ID is required' });
+        return;
+      }
+
+      const updatedMessage = await this.messageService.markMessageAsSeen(
+        data.messageId,
+        userId,
+      );
+
+      const chatId = updatedMessage.chatId;
+      if (!chatId) {
+        client.emit(ChatEvents.Error, {
+          message: 'Chat ID not found in updated message',
+        });
+        return;
+      }
+
+      this.server.to(chatId).emit(ChatEvents.MessageSeen, {
+        messageId: data.messageId,
+        userId,
+      });
+    } catch (err) {
+      this.logger.error(`Error marking message as seen: ${err.message}`);
+      client.emit(ChatEvents.Error, { message: err.message });
+    }
   }
 }

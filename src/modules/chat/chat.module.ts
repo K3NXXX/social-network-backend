@@ -22,6 +22,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
     ConfigService,
     UserService,
     CloudinaryService,
+    PrismaService,
   ],
 })
 export class ChatModule {}
