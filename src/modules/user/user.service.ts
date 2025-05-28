@@ -212,7 +212,7 @@ export class UserService {
 
     return updatedUser;
   }
-  
+
   public async search(query: string) {
     if (!query?.trim()) return false;
 
@@ -240,11 +240,13 @@ export class UserService {
   }
 
   /// REDIS
-  async setUserOnline(userId: string): Promise<void>
+  async setUserOnline(userId: string): Promise<void> {
     await this.redis.sadd(this.ONLINE_USERS_SET, userId);
+  }
 
-  async setUserOffline(userId: string): Promise<void>
+  async setUserOffline(userId: string): Promise<void> {
     await this.redis.srem(this.ONLINE_USERS_SET, userId);
+  }
 
   async isUserOnline(userId: string): Promise<boolean> {
     const isMember = await this.redis.sismember(this.ONLINE_USERS_SET, userId);
@@ -253,4 +255,5 @@ export class UserService {
 
   async getOnlineUsers(): Promise<string[]> {
     return this.redis.smembers(this.ONLINE_USERS_SET);
+  }
 }
