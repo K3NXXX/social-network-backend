@@ -5,13 +5,13 @@ export class MessageDto {
   @IsUUID()
   chatId?: string;
 
-  @IsOptional()
   @IsUUID()
-  receiverId?: string;
+  @IsNotEmpty()
+  receiverId: string;
 
   @IsString()
-  @IsNotEmpty()
-  content: string;
+  @IsOptional()
+  content?: string;
 
   @IsOptional()
   @IsString()
