@@ -29,7 +29,7 @@ export class UserController {
   }
 
   @Authorization()
-  @Get()
+  @Get('profile')
   async getUser(@CurrentUser('id') userId: string) {
     return this.userService.getProfile(userId);
   }
