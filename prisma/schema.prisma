@@ -45,7 +45,7 @@ model User {
 
   dateOfBirth    DateTime?
   gender         Gender?   @default(OTHER)
-  avatar         String?
+  avatarUrl      String?
   avatarPublicId String?
   bio            String?
   location       String?
@@ -67,9 +67,9 @@ model User {
   notifications     Notification[] @relation("UserNotifications")
   sentNotifications Notification[] @relation("NotificationSender")
 
-  chats          Chat[]            @relation("Chats")
-  participations ChatParticipant[]
-  messages       Message[]         @relation("SentMessages")
+  chats              Chat[]            @relation("Chats")
+  chatParticipations ChatParticipant[]
+  chatMessages       Message[]         @relation("SentMessages")
 
   blockedUsers   BlockedUser[] @relation("Blocker")
   blockedByUsers BlockedUser[] @relation("Blocked")
@@ -255,10 +255,10 @@ model ChatParticipant {
 }
 
 model Message {
-  id      String  @id @default(uuid())
-  content String
-  image   String?
-  isRead  Boolean @default(false) @map("is_read")
+  id       String  @id @default(uuid())
+  content  String
+  imageUrl String?
+  isRead   Boolean @default(false) @map("is_read")
 
   senderId String
   sender   User   @relation("SentMessages", fields: [senderId], references: [id])
