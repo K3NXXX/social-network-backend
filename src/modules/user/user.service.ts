@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,16 +9,20 @@ import { compare, genSalt, hash } from 'bcrypt';
 import { PrismaService } from '../../common/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { UpdateUserDto } from './dto/user.dto';
+import Redis from 'ioredis';
 
 @Injectable()
 export class UserService {
   public constructor(
-    private readonly prismaService: PrismaService,
+    private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
+  private ONLINE_USERS_SET = 'online_users';
+
   public async findById(id: string) {
-    const user = await this.prismaService.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id },
     });
 
@@ -27,11 +32,87 @@ export class UserService {
   }
 
   public async findByEmail(email: string) {
-    const user = await this.prismaService.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
     return user;
+  }
+
+  public async getProfile(id: string) {
+    const profile = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        posts: {
+          select: {
+            id: true,
+            content: true,
+            photo: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!profile) throw new NotFoundException('User not found');
+
+    const [followers, following] = await Promise.all([
+      this.prisma.follow.count({
+        where: { followingId: id },
+      }),
+      this.prisma.follow.count({
+        where: { followerId: id },
+      }),
+    ]);
+
+    return { ...profile, followers, following };
+  }
+
+  public async getOnlineFollows(userId: string) {
+    const following = await this.prisma.follow.findMany({
+      where: { followerId: userId },
+      select: { followingId: true },
+    });
+
+    const followers = await this.prisma.follow.findMany({
+      where: { followingId: userId },
+      select: { followerId: true },
+    });
+
+    const userIdsSet = new Set<string>();
+    following.forEach((f) => userIdsSet.add(f.followingId));
+    followers.forEach((f) => userIdsSet.add(f.followerId));
+
+    const allUserIds = Array.from(userIdsSet);
+
+    if (allUserIds.length === 0) return [];
+
+    const onlineUsers = await this.redis.smembers(this.ONLINE_USERS_SET);
+    const onlineFollowedIds = allUserIds.filter((id) =>
+      onlineUsers.includes(id),
+    );
+
+    if (onlineFollowedIds.length === 0) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: onlineFollowedIds } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        username: true,
+        avatarUrl: true,
+      },
+    });
+
+    return users;
+  }
+
+  async updateLastLogin(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { lastLogin: new Date() },
+    });
   }
 
   public async create(
@@ -41,7 +122,7 @@ export class UserService {
     password: string,
     confirmPassword: string,
   ) {
-    const existingUser = await this.prismaService.user.findUnique({
+    const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
 
@@ -54,7 +135,7 @@ export class UserService {
     const salt = await genSalt(10);
     password = await hash(password, salt);
 
-    const user = await this.prismaService.user.create({
+    const user = await this.prisma.user.create({
       data: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -69,7 +150,7 @@ export class UserService {
   public async update(updateUserDto: UpdateUserDto, userId: string) {
     const { currentPassword, newPassword, email, ...otherData } = updateUserDto;
 
-    const user = await this.prismaService.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
@@ -85,7 +166,7 @@ export class UserService {
       hashedPassword = await hash(newPassword, salt);
     }
 
-    const updatedUser = await this.prismaService.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: user.id },
       data: {
         ...otherData,
@@ -105,7 +186,7 @@ export class UserService {
   }
 
   public async uploadAvatar(file: Express.Multer.File, userId: string) {
-    const user = await this.prismaService.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -116,7 +197,7 @@ export class UserService {
     const avatarUrl = uploadResult.secure_url;
     const avatarPublicId = uploadResult.public_id;
 
-    const updatedUser = await this.prismaService.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: { avatarUrl, avatarPublicId: avatarPublicId },
     });
@@ -125,7 +206,7 @@ export class UserService {
   }
 
   public async deleteAvatar(userId: string) {
-    const user = await this.prismaService.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -138,11 +219,29 @@ export class UserService {
       }
     }
 
-    const updatedUser = await this.prismaService.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: { avatarUrl: null, avatarPublicId: null },
     });
 
     return updatedUser;
+  }
+
+  /// REDIS
+  async setUserOnline(userId: string): Promise<void> {
+    await this.redis.sadd(this.ONLINE_USERS_SET, userId);
+  }
+
+  async setUserOffline(userId: string): Promise<void> {
+    await this.redis.srem(this.ONLINE_USERS_SET, userId);
+  }
+
+  async isUserOnline(userId: string): Promise<boolean> {
+    const isMember = await this.redis.sismember(this.ONLINE_USERS_SET, userId);
+    return isMember === 1;
+  }
+
+  async getOnlineUsers(): Promise<string[]> {
+    return this.redis.smembers(this.ONLINE_USERS_SET);
   }
 }

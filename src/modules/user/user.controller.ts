@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Param,
   Patch,
   UploadedFile,
   UseInterceptors,
@@ -23,8 +24,19 @@ export class UserController {
 
   @Authorization()
   @Get()
-  async getProfile(@CurrentUser('id') userId: string) {
-    return this.userService.findById(userId);
+  async getUser(@CurrentUser('id') userId: string) {
+    return this.userService.getProfile(userId);
+  }
+
+  @Get('profile/:id')
+  async getProfile(@Param('id') userId: string) {
+    return this.userService.getProfile(userId);
+  }
+
+  @Authorization()
+  @Get('friends')
+  async getOnlineFollows(@CurrentUser('id') userId: string) {
+    return this.userService.getOnlineFollows(userId);
   }
 
   @Authorization()
