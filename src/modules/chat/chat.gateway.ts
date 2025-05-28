@@ -126,12 +126,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         throw new InternalServerErrorException('User ID not found in socket');
 
       const message = await this.messageService.sendMessage(senderId, dto);
-
       const chatId = message.chat?.id;
       if (!chatId)
         throw new InternalServerErrorException('Chat ID missing in message');
 
-      if (message.isNewChat) {
+      client.join(chatId);
+
+      if (message.isNew) {
         client.emit(ChatEvents.ChatCreated, chatId);
 
         const receiverId = dto.receiverId;

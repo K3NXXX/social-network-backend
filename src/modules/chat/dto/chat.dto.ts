@@ -20,7 +20,7 @@ export class ChatDto {
   @IsOptional()
   lastMessage?: {
     id: string;
-    content: string;
+    content?: string;
     imageUrl?: string | null;
     createdAt: Date;
     sender: {
@@ -38,5 +38,6 @@ export class ChatDto {
     firstName: string;
     lastName: string;
     avatarUrl?: string | null;
+    isOnline?: boolean;
   }[];
 }
