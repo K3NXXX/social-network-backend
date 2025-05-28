@@ -21,6 +21,21 @@ export class ChatService {
           ],
         },
       },
+      include: {
+        participants: {
+          select: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                username: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     return chat;
@@ -30,35 +45,49 @@ export class ChatService {
     if (senderId === receiverId)
       throw new BadRequestException("Can't chat with yourself");
 
-    const user = await this.userService.findById(receiverId);
-
     const chat = await this.prisma.chat.findFirst({
       where: {
         isGroup: false,
+        AND: [
+          { participants: { some: { userId: senderId } } },
+          { participants: { some: { userId: receiverId } } },
+        ],
+      },
+      include: {
         participants: {
-          some: { userId: senderId },
-        },
-        AND: {
-          participants: {
-            some: { userId: receiverId },
+          select: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                username: true,
+                avatarUrl: true,
+              },
+            },
           },
         },
       },
     });
 
-    return {
-      user,
-      chat: chat ? chat : null,
-    };
+    if (chat) return { chat, isNew: false };
+
+    const newChat = await this.create(senderId, receiverId);
+    return { chat: newChat, isNew: true };
   }
 
-  async getUserChats(userId: string): Promise<ChatDto[]> {
+  async getUserChats(
+    userId: string,
+    take = 20,
+    cursor?: string,
+  ): Promise<ChatDto[]> {
     const chats = await this.prisma.chat.findMany({
       where: {
-        participants: {
-          some: { userId },
-        },
+        participants: { some: { userId } },
       },
+      take,
+      skip: cursor ? 1 : undefined,
+      ...(cursor && { cursor: { id: cursor } }),
       include: {
         participants: {
           include: {
@@ -67,6 +96,7 @@ export class ChatService {
                 id: true,
                 firstName: true,
                 lastName: true,
+                username: true,
                 avatarUrl: true,
               },
             },
@@ -81,6 +111,7 @@ export class ChatService {
                 id: true,
                 firstName: true,
                 lastName: true,
+                username: true,
                 avatarUrl: true,
               },
             },
@@ -93,19 +124,19 @@ export class ChatService {
     return Promise.all(
       chats.map(async (chat) => ({
         chatId: chat.id,
-        chatName: chat.name,
+        name: chat.name ?? null,
         isGroup: chat.isGroup,
         lastMessage: chat.messages[0]
           ? {
               id: chat.messages[0].id,
-              content: chat.messages[0].content,
-              imageUrl: chat.messages[0].imageUrl,
+              content: chat.messages[0].content ?? undefined,
+              imageUrl: chat.messages[0].imageUrl ?? null,
               createdAt: chat.messages[0].createdAt,
               sender: {
                 id: chat.messages[0].sender.id,
                 firstName: chat.messages[0].sender.firstName,
                 lastName: chat.messages[0].sender.lastName,
-                avatarUrl: chat.messages[0].sender.avatarUrl,
+                avatarUrl: chat.messages[0].sender.avatarUrl ?? null,
               },
             }
           : null,
@@ -114,7 +145,7 @@ export class ChatService {
             id: p.user.id,
             firstName: p.user.firstName,
             lastName: p.user.lastName,
-            avatarUrl: p.user.avatarUrl,
+            avatarUrl: p.user.avatarUrl ?? null,
             isOnline: await this.userService.isUserOnline(p.user.id),
           })),
         ),
