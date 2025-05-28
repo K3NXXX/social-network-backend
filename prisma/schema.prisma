@@ -235,6 +235,7 @@ model Chat {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([updatedAt])
   @@map("chats")
 }
 
@@ -251,12 +252,14 @@ model ChatParticipant {
   leftAt   DateTime? @map("left_at")
 
   @@unique([userId, chatId])
+  @@index([chatId])
+  @@index([userId])
   @@map("chat_participants")
 }
 
 model Message {
   id       String  @id @default(uuid())
-  content  String
+  content  String?
   imageUrl String?
   isRead   Boolean @default(false) @map("is_read")
 
@@ -269,5 +272,6 @@ model Message {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([chatId, createdAt])
   @@map("messages")
 }
