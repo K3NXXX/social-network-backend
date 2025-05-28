@@ -178,7 +178,7 @@ export class UserService {
   }
 
   public async uploadAvatar(file: Express.Multer.File, userId: string) {
-    const user = await this.findById(userId);
+    await this.findById(userId);
 
     if (!file) throw new BadRequestException('File is required');
 
