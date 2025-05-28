@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Patch,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -21,6 +22,11 @@ export class UserController {
     private readonly userService: UserService,
     private readonly followService: FollowService,
   ) {}
+
+  @Get()
+  async search(@Query('search') query: string) {
+    return this.userService.search(query);
+  }
 
   @Authorization()
   @Get()
@@ -61,7 +67,7 @@ export class UserController {
   }
 
   @Authorization()
-  @Patch('uploadAvatar')
+  @Patch('update/avatar')
   @UseInterceptors(FileInterceptor('file'))
   async uploadAvatar(
     @UploadedFile() file: Express.Multer.File,
@@ -71,7 +77,7 @@ export class UserController {
   }
 
   @Authorization()
-  @Delete('deleteAvatar')
+  @Delete('delete/avatar')
   async deleteAvatar(@CurrentUser('id') userId: string) {
     return this.userService.deleteAvatar(userId);
   }

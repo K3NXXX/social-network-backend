@@ -10,9 +10,8 @@ import { PostModule } from './modules/post/post.module';
 import { CommentModule } from './modules/comment/comment.module';
 import { LikeModule } from './modules/like/like.module';
 import { FollowModule } from './modules/follow/follow.module';
-import { ChatModule } from './modules/chat/chat.module';
-import { MessageModule } from './modules/chat/message/message.module';
-
+import { BlockUserModule } from './modules/block-user/block-user.module';
+import { NotificationModule } from './modules/notification/notification.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -25,8 +24,8 @@ import { MessageModule } from './modules/chat/message/message.module';
     CommentModule,
     LikeModule,
     FollowModule,
-    ChatModule,
-    MessageModule,
+    NotificationModule,
+    BlockUserModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

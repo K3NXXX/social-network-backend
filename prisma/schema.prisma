@@ -72,10 +72,28 @@ model User {
   chatParticipations ChatParticipant[]
   sentMessages       Message[]         @relation("SentMessages")
 
+  blockedUsers   BlockedUser[] @relation("Blocker")
+  blockedByUsers BlockedUser[] @relation("Blocked")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model BlockedUser {
+  id String @id @default(uuid())
+
+  blockerId String
+  blocker   User   @relation("Blocker", fields: [blockerId], references: [id])
+
+  blockedId String
+  blocked   User   @relation("Blocked", fields: [blockedId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([blockerId, blockedId])
+  @@map("blocked_users")
 }
 
 model Post {
@@ -138,6 +156,8 @@ model Like {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  notifications Notification[]
+
   @@unique([userId, postId])
   @@unique([userId, commentId])
   @@map("likes")
@@ -189,6 +209,9 @@ model Notification {
 
   postId String?
   post   Post?   @relation(fields: [postId], references: [id])
+
+  likeId String?
+  like   Like?   @relation(fields: [likeId], references: [id])
 
   commentId String?
   comment   Comment? @relation(fields: [commentId], references: [id])
