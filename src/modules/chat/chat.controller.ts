@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { Authorization } from '../../common/decorators/auth.decorator';
 import { CurrentUser } from '../../common/decorators/user.decorator';
@@ -12,9 +12,17 @@ export class ChatController {
     private readonly messageService: MessageService,
   ) {}
 
-  @Get()
-  async getAll() {
-    return this.chatService.getAll();
+  @Post()
+  async create(
+    @CurrentUser('id') senderId: string,
+    @Body('receiverId') receiverId: string,
+  ) {
+    return this.chatService.create(senderId, receiverId);
+  }
+
+  @Get('i')
+  async getUserChats(@CurrentUser('id') userId: string) {
+    return this.chatService.getUserChats(userId);
   }
 
   @Get(':receiverId')

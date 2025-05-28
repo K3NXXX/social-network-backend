@@ -7,10 +7,6 @@ export class MessageDto {
 
   @IsOptional()
   @IsUUID()
-  senderId: string;
-
-  @IsOptional()
-  @IsUUID()
   receiverId?: string;
 
   @IsString()

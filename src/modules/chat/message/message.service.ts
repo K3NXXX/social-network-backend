@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma.service';
 import { MessageDto } from './dto/message.dto';
 import { ChatService } from '../chat.service';
@@ -10,43 +15,27 @@ export class MessageService {
     private readonly chatService: ChatService,
   ) {}
 
-  async sendMessage(dto: MessageDto) {
-    const { content, imageUrl, senderId, receiverId } = dto;
+  async sendMessage(senderId: string, dto: MessageDto) {
+    const { content, imageUrl, receiverId } = dto;
 
     if (!content?.trim() && !imageUrl)
       throw new BadRequestException('Message must contain content or image');
+
     if (!receiverId)
       throw new BadRequestException('ReceiverId must be provided');
 
-    const chat = await this.prisma.chat.findFirst({
-      where: {
-        participants: {
-          every: {
-            OR: [{ userId: senderId }, { userId: receiverId }],
-          },
-        },
-      },
-      include: {
-        participants: true,
-      },
-    });
+    const existingChat = await this.chatService.getChat(senderId, receiverId);
 
     let chatId: string;
+    let isNewChat = false;
 
-    if (!chat) {
-      const newChat = await this.prisma.chat.create({
-        data: {
-          creatorId: senderId,
-          participants: {
-            create: [
-              { user: { connect: { id: senderId } } },
-              { user: { connect: { id: receiverId } } },
-            ],
-          },
-        },
-      });
+    if (existingChat?.chat?.id) {
+      chatId = existingChat.chat.id;
+    } else {
+      const newChat = await this.chatService.create(senderId, receiverId);
       chatId = newChat.id;
-    } else chatId = chat.id;
+      isNewChat = true;
+    }
 
     const message = await this.prisma.message.create({
       data: {
@@ -84,33 +73,77 @@ export class MessageService {
       },
     });
 
-    return message;
+    return { ...message, isNewChat };
   }
 
   async getMessages(userId: string, receiverId: string) {
     const chat = await this.chatService.getChat(userId, receiverId);
-    let messages: any[] = [];
-    if (chat.chatId) {
-      messages = await this.prisma.message.findMany({
-        where: {
-          chatId: chat.chatId as string,
+    if (!chat.chat?.id) return [];
+
+    const messages = await this.prisma.message.findMany({
+      where: { chatId: chat.chat?.id },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            avatarUrl: true,
+          },
         },
-        include: {
-          sender: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              username: true,
-              avatarUrl: true,
+      },
+    });
+
+    return messages;
+  }
+
+  async getMessage(id: string) {
+    return this.prisma.message.findUnique({
+      where: { id },
+      include: {
+        chat: {
+          select: {
+            id: true,
+            creatorId: true,
+            participants: {
+              select: { id: true },
             },
           },
         },
-      });
-    } else {
-      return false;
-    }
+      },
+    });
+  }
 
-    return messages;
+  async markMessageAsSeen(messageId: string, userId: string) {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        chat: {
+          select: {
+            id: true,
+            participants: {
+              select: { userId: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!message) throw new NotFoundException('Message not found');
+
+    const isParticipant = message.chat.participants.some(
+      (participant) => participant.userId.toString() === userId.toString(),
+    );
+
+    if (!isParticipant)
+      throw new ForbiddenException('You are not a participant of this chat');
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { isRead: true },
+    });
+
+    return { chatId: message.chat.id };
   }
 }
