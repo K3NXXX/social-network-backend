@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE")
+  url      = env("DATABASE_URL")
 }
 
 enum Gender {
@@ -45,22 +45,21 @@ model User {
 
   dateOfBirth    DateTime?
   gender         Gender?   @default(OTHER)
-  avatarUrl      String?
+  avatar         String?
   avatarPublicId String?
   bio            String?
   location       String?
 
-  isOnline      Boolean   @default(false)
-  lastLogin     DateTime?
-  amountOfPosts Int       @default(0)
+  isOnline  Boolean   @default(false) @map("is_online")
+  lastLogin DateTime? @map("last_login")
 
   isActive   Status  @default(ACTIVE)
   isVerified Boolean @default(false) @map("is_verified")
 
-  posts      Post[]
-  comments   Comment[]
-  likes      Like[]
-  savedPosts SavedPost[]
+  posts    Post[]
+  comments Comment[]
+  likes    Like[]
+  saved    SavedPost[]
 
   followers Follow[] @relation("Followers")
   following Follow[] @relation("Following")
@@ -68,9 +67,9 @@ model User {
   notifications     Notification[] @relation("UserNotifications")
   sentNotifications Notification[] @relation("NotificationSender")
 
-  chats              Chat[]            @relation("Chats")
-  chatParticipations ChatParticipant[]
-  sentMessages       Message[]         @relation("SentMessages")
+  chats          Chat[]            @relation("Chats")
+  participations ChatParticipant[]
+  messages       Message[]         @relation("SentMessages")
 
   blockedUsers   BlockedUser[] @relation("Blocker")
   blockedByUsers BlockedUser[] @relation("Blocked")
@@ -199,7 +198,7 @@ model Notification {
   id      String           @id @default(uuid())
   type    NotificationType
   message String
-  isRead  Boolean          @default(false)
+  isRead  Boolean          @default(false) @map("is_read")
 
   userId String
   user   User   @relation("UserNotifications", fields: [userId], references: [id])
@@ -256,10 +255,10 @@ model ChatParticipant {
 }
 
 model Message {
-  id       String  @id @default(uuid())
-  content  String
-  imageUrl String?
-  isRead   Boolean @default(false)
+  id      String  @id @default(uuid())
+  content String
+  image   String?
+  isRead  Boolean @default(false) @map("is_read")
 
   senderId String
   sender   User   @relation("SentMessages", fields: [senderId], references: [id])
