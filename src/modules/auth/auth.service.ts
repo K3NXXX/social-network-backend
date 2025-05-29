@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { LoginDto, SignupDto } from './dto/auth.dto';
 import { compare } from 'bcrypt';
+import { EmailConfirmationService } from './email-confirmation/email-confirmation.service'
 
 @Injectable()
 export class AuthService {
@@ -17,6 +18,7 @@ export class AuthService {
     private jwt: JwtService,
     private userService: UserService,
     private configService: ConfigService,
+    private emailConfirmationService: EmailConfirmationService,
   ) {}
 
   async register(dto: SignupDto) {
@@ -28,12 +30,23 @@ export class AuthService {
     );
     const tokens = this.issueTokens(user.id);
 
-    return { user, ...tokens };
+    //////////////////////////////
+    await this.emailConfirmationService.sendVerificationToken(user)
+
+    return { massage:
+      'Registration successful! Check your email to confirm your account', user, ...tokens };
   }
 
   async login(dto: LoginDto) {
     const user = await this.validate(dto);
     const tokens = this.issueTokens(user.id);
+
+    if(!user.isVerified) {
+      await this.emailConfirmationService.sendVerificationToken(user)
+      throw new UnauthorizedException(
+        'Your email has not been confirmed.'
+      )
+    }
 
     return { user, ...tokens };
   }

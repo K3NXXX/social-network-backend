@@ -34,6 +34,13 @@ enum NotificationType {
   NEW_FOLLOWER
 }
 
+// Token type for email verification, two-factor authentication, and password reset
+enum TokenType {
+  VERIFICATION
+  TWO_FACTOR
+  PASSWORD_RESET
+}
+
 // Rest of the schema remains unchanged since it was already in English
 model User {
   id        String  @id @default(uuid())
@@ -50,16 +57,17 @@ model User {
   bio            String?
   location       String?
 
-  isOnline  Boolean   @default(false) @map("is_online")
-  lastLogin DateTime? @map("last_login")
+  isOnline      Boolean   @default(false)
+  lastLogin     DateTime?
+  amountOfPosts Int       @default(0)
 
   isActive   Status  @default(ACTIVE)
   isVerified Boolean @default(false) @map("is_verified")
 
-  posts    Post[]
-  comments Comment[]
-  likes    Like[]
-  saved    SavedPost[]
+  posts      Post[]
+  comments   Comment[]
+  likes      Like[]
+  savedPosts SavedPost[]
 
   followers Follow[] @relation("Followers")
   following Follow[] @relation("Following")
@@ -69,7 +77,7 @@ model User {
 
   chats              Chat[]            @relation("Chats")
   chatParticipations ChatParticipant[]
-  chatMessages       Message[]         @relation("SentMessages")
+  sentMessages       Message[]         @relation("SentMessages")
 
   blockedUsers   BlockedUser[] @relation("Blocker")
   blockedByUsers BlockedUser[] @relation("Blocked")
@@ -198,7 +206,7 @@ model Notification {
   id      String           @id @default(uuid())
   type    NotificationType
   message String
-  isRead  Boolean          @default(false) @map("is_read")
+  isRead  Boolean          @default(false)
 
   userId String
   user   User   @relation("UserNotifications", fields: [userId], references: [id])
@@ -235,7 +243,6 @@ model Chat {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@index([updatedAt])
   @@map("chats")
 }
 
@@ -249,19 +256,17 @@ model ChatParticipant {
   chat   Chat   @relation(fields: [chatId], references: [id])
 
   joinedAt DateTime  @default(now()) @map("joined_at")
-  leftAt   DateTime? @map("left_at")
+  leftAt   DateTime?
 
   @@unique([userId, chatId])
-  @@index([chatId])
-  @@index([userId])
   @@map("chat_participants")
 }
 
 model Message {
   id       String  @id @default(uuid())
-  content  String?
+  content  String
   imageUrl String?
-  isRead   Boolean @default(false) @map("is_read")
+  isRead   Boolean @default(false)
 
   senderId String
   sender   User   @relation("SentMessages", fields: [senderId], references: [id])
@@ -272,6 +277,18 @@ model Message {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@index([chatId, createdAt])
   @@map("messages")
+}
+
+model Token {
+  id String @id @default(uuid())
+
+  email     String
+  token     String    @unique
+  type      TokenType
+  expiresIn DateTime  @map("expires_in")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@map("tokens")
 }
