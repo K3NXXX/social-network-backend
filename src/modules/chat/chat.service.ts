@@ -41,7 +41,7 @@ export class ChatService {
     return chat;
   }
 
-  async getChat(senderId: string, receiverId: string) {
+  async findChat(senderId: string, receiverId: string) {
     if (senderId === receiverId)
       throw new BadRequestException("Can't chat with yourself");
 
@@ -70,13 +70,19 @@ export class ChatService {
       },
     });
 
+    return chat;
+  }
+
+  async findOrCreateChat(senderId: string, receiverId: string) {
+    const chat = await this.findChat(senderId, receiverId);
+
     if (chat) return { chat, isNew: false };
 
     const newChat = await this.create(senderId, receiverId);
     return { chat: newChat, isNew: true };
   }
 
-  async getUserChats(
+  async findUserChats(
     userId: string,
     take = 20,
     cursor?: string,
