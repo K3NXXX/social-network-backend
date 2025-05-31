@@ -1,72 +1,85 @@
 import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Req,
-  Res,
-  UnauthorizedException,
+	Body,
+	Controller,
+	Post,
+	Req,
+	Res,
+	UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, SignupDto } from './dto/auth.dto';
 import { Request, Response } from 'express';
 import { Authorization } from '../../common/decorators/auth.decorator';
+import { EmailConfirmationService } from './email-confirmation/email-confirmation.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+	constructor(
+		private readonly authService: AuthService,
+		private emailConfirmationService: EmailConfirmationService,
+	) {}
 
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  async register(
-    @Body() dto: SignupDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { refreshToken, ...response } = await this.authService.register(dto);
+	@Post('register')
+	async register(@Body() dto: SignupDto) {
+		await this.authService.register(dto);
 
-    this.authService.addRefreshToken(res, refreshToken);
+		return {
+			message: 'Verification code sent to your email',
+		};
+	}
 
-    return response;
-  }
+	@Post('register/confirm')
+	async verifyCode(
+		@Body('code') code: number,
+		@Res({ passthrough: true }) res: Response,
+	) {
+		const user = await this.emailConfirmationService.verifyCode(code);
 
-  @Post('login')
-  @HttpCode(HttpStatus.CREATED)
-  async login(
-    @Body() dto: LoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { refreshToken, ...response } = await this.authService.login(dto);
+		const tokens = this.authService.issueTokens(user.id);
+		this.authService.addRefreshToken(res, tokens.refreshToken);
 
-    this.authService.addRefreshToken(res, refreshToken);
+		return {
+			message: 'Account verified and registered successfully!',
+			user,
+			accessToken: tokens.accessToken,
+		};
+	}
 
-    return response;
-  }
+	@Post('login')
+	async login(
+		@Body() dto: LoginDto,
+		@Res({ passthrough: true }) res: Response,
+	) {
+		const { refreshToken, ...response } = await this.authService.login(dto);
 
-  @Post('logout')
-  async logout(@Res({ passthrough: true }) res: Response) {
-    this.authService.removeRefreshToken(res);
-    return true;
-  }
+		this.authService.addRefreshToken(res, refreshToken);
 
-  @Post('refresh')
-  @Authorization()
-  @HttpCode(HttpStatus.CREATED)
-  async refresh(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const refreshToken = req.cookies['refreshToken'];
-    if (!refreshToken) throw new UnauthorizedException('Refresh token missing');
+		return response;
+	}
 
-    const {
-      user,
-      accessToken,
-      refreshToken: newRefreshToken,
-    } = await this.authService.refresh(refreshToken);
+	@Post('logout')
+	async logout(@Res({ passthrough: true }) res: Response) {
+		this.authService.removeRefreshToken(res);
+		return true;
+	}
 
-    this.authService.addRefreshToken(res, newRefreshToken);
+	@Authorization()
+	@Post('refresh')
+	async refresh(
+		@Req() req: Request,
+		@Res({ passthrough: true }) res: Response,
+	) {
+		const refreshToken = req.cookies['refreshToken'];
+		if (!refreshToken) throw new UnauthorizedException('Refresh token missing');
 
-    return { accessToken, user };
-  }
+		const {
+			user,
+			accessToken,
+			refreshToken: newRefreshToken,
+		} = await this.authService.refresh(refreshToken);
+
+		this.authService.addRefreshToken(res, newRefreshToken);
+
+		return { accessToken, user };
+	}
 }
