@@ -90,7 +90,7 @@ model User {
 
 model Token {
   id        String    @id @default(uuid())
-  email     String
+  email     String    @unique
   code      Int
   type      TokenType
   expiresIn DateTime  @map("expires_in")
@@ -98,6 +98,7 @@ model Token {
 
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@index([email, type])
   @@index([code, type])
   @@map("tokens")
 }
