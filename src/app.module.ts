@@ -12,8 +12,8 @@ import { LikeModule } from './modules/like/like.module';
 import { FollowModule } from './modules/follow/follow.module';
 import { BlockUserModule } from './modules/block-user/block-user.module';
 import { NotificationModule } from './modules/notification/notification.module';
-import { ChatModule } from './modules/chat/chat.module';
-import { MessageModule } from './modules/chat/message/message.module';
+import { MailModule } from './common/mail/mail.module';
+import { EmailConfirmationModule } from './modules/auth/email-confirmation/email-confirmation.module';
 
 @Module({
   imports: [
@@ -29,8 +29,8 @@ import { MessageModule } from './modules/chat/message/message.module';
     FollowModule,
     NotificationModule,
     BlockUserModule,
-    ChatModule,
-    MessageModule,
+    MailModule,
+    EmailConfirmationModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

@@ -28,7 +28,7 @@ export class MessageService {
 
     const message = await this.prisma.message.create({
       data: {
-        content: content?.trim(),
+        content: content?.trim() || '',
         imageUrl,
         senderId,
         chatId: chat.id,

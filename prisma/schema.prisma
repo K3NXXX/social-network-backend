@@ -35,6 +35,13 @@ enum NotificationType {
   NEW_FOLLOWER
 }
 
+// Token type for email verification, two-factor authentication, and password reset
+enum TokenType {
+  VERIFICATION
+  TWO_FACTOR
+  PASSWORD_RESET
+}
+
 // Rest of the schema remains unchanged since it was already in English
 model User {
   id        String  @id @default(uuid())
@@ -70,7 +77,7 @@ model User {
 
   chats              Chat[]            @relation("Chats")
   chatParticipations ChatParticipant[]
-  chatMessages       Message[]         @relation("SentMessages")
+  sentMessages       Message[]         @relation("SentMessages")
 
   blockedUsers   BlockedUser[] @relation("Blocker")
   blockedByUsers BlockedUser[] @relation("Blocked")
@@ -79,6 +86,21 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model Token {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  code      Int
+  type      TokenType
+  expiresIn DateTime  @map("expires_in")
+  meta      Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, type])
+  @@index([code, type])
+  @@map("tokens")
 }
 
 model BlockedUser {
