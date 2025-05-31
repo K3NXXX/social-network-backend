@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -57,17 +58,16 @@ model User {
   bio            String?
   location       String?
 
-  isOnline      Boolean   @default(false)
-  lastLogin     DateTime?
-  amountOfPosts Int       @default(0)
+  isOnline  Boolean   @default(false) @map("is_online")
+  lastLogin DateTime? @map("last_login")
 
   isActive   Status  @default(ACTIVE)
   isVerified Boolean @default(false) @map("is_verified")
 
-  posts      Post[]
-  comments   Comment[]
-  likes      Like[]
-  savedPosts SavedPost[]
+  posts    Post[]
+  comments Comment[]
+  likes    Like[]
+  saved    SavedPost[]
 
   followers Follow[] @relation("Followers")
   following Follow[] @relation("Following")
@@ -86,6 +86,20 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model Token {
+  id        String    @id @default(uuid())
+  email     String
+  code      Int
+  type      TokenType
+  expiresIn DateTime  @map("expires_in")
+  meta      Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([code, type])
+  @@map("tokens")
 }
 
 model BlockedUser {
@@ -206,7 +220,7 @@ model Notification {
   id      String           @id @default(uuid())
   type    NotificationType
   message String
-  isRead  Boolean          @default(false)
+  isRead  Boolean          @default(false) @map("is_read")
 
   userId String
   user   User   @relation("UserNotifications", fields: [userId], references: [id])
@@ -243,6 +257,7 @@ model Chat {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([updatedAt])
   @@map("chats")
 }
 
@@ -256,17 +271,19 @@ model ChatParticipant {
   chat   Chat   @relation(fields: [chatId], references: [id])
 
   joinedAt DateTime  @default(now()) @map("joined_at")
-  leftAt   DateTime?
+  leftAt   DateTime? @map("left_at")
 
   @@unique([userId, chatId])
+  @@index([chatId])
+  @@index([userId])
   @@map("chat_participants")
 }
 
 model Message {
   id       String  @id @default(uuid())
-  content  String
+  content  String?
   imageUrl String?
-  isRead   Boolean @default(false)
+  isRead   Boolean @default(false) @map("is_read")
 
   senderId String
   sender   User   @relation("SentMessages", fields: [senderId], references: [id])
@@ -277,18 +294,6 @@ model Message {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([chatId, createdAt])
   @@map("messages")
-}
-
-model Token {
-  id String @id @default(uuid())
-
-  email     String
-  token     String    @unique
-  type      TokenType
-  expiresIn DateTime  @map("expires_in")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  
-  @@map("tokens")
 }
