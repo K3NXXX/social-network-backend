@@ -21,7 +21,7 @@ export class MessageService {
     if (!content?.trim() && !imageUrl)
       throw new BadRequestException('Message must contain content or image');
 
-    const { chat, isNew } = await this.chatService.getChat(
+    const { chat, isNew } = await this.chatService.findOrCreateChat(
       senderId,
       receiverId,
     );
@@ -60,7 +60,7 @@ export class MessageService {
     take = 30,
     cursor?: string,
   ) {
-    const { chat } = await this.chatService.getChat(userId, receiverId);
+    const chat = await this.chatService.findChat(userId, receiverId);
     if (!chat) return [];
 
     const where: any = {
