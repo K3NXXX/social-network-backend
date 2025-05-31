@@ -12,7 +12,7 @@ import { hash } from 'bcrypt';
 
 @Injectable()
 export class EmailConfirmationService {
-	public constructor(
+	constructor(
 		private readonly prisma: PrismaService,
 		private readonly mailService: MailService,
 		private readonly userService: UserService,
@@ -23,17 +23,25 @@ export class EmailConfirmationService {
 	}
 
 	public async sendVerificationCode(dto: SignupDto) {
-		const code = this.generateVerificationCode();
-		const expiresIn = new Date(Date.now() + 15 * 60 * 1000);
-
 		const existing = await this.prisma.token.findFirst({
 			where: { email: dto.email, type: TokenType.VERIFICATION },
 		});
 
-		if (existing)
+		if (existing) {
+			const secondsElapsed =
+				(Date.now() - new Date(existing.createdAt).getTime()) / 1000;
+
+			if (secondsElapsed < 60)
+				throw new BadRequestException(
+					`Please wait ${Math.ceil(60 - secondsElapsed)} seconds before requesting a new code.`,
+				);
+
 			await this.prisma.token.delete({ where: { id: existing.id } });
+		}
 
 		const hashedPassword = await hash(dto.password, 10);
+		const code = this.generateVerificationCode();
+		const expiresIn = new Date(Date.now() + 15 * 60 * 1000);
 
 		const meta: SignupMeta = {
 			firstName: dto.firstName,
@@ -55,9 +63,42 @@ export class EmailConfirmationService {
 		await this.mailService.sendConfirmationCode(dto.email, +code);
 	}
 
+	public async resendVerificationCode(email: string) {
+		const existing = await this.prisma.token.findFirst({
+			where: { email, type: TokenType.VERIFICATION },
+		});
+
+		if (!existing)
+			throw new NotFoundException(
+				'No pending registration found for this email',
+			);
+
+		const secondsElapsed =
+			(Date.now() - new Date(existing.createdAt).getTime()) / 1000;
+
+		if (secondsElapsed < 60)
+			throw new BadRequestException(
+				`Please wait ${Math.ceil(60 - secondsElapsed)} seconds before requesting a new code.`,
+			);
+
+		const newCode = this.generateVerificationCode();
+		const newExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+		await this.prisma.token.update({
+			where: { id: existing.id },
+			data: {
+				code: +newCode,
+				expiresIn: newExpires,
+				createdAt: new Date(),
+			},
+		});
+
+		await this.mailService.sendConfirmationCode(email, +newCode);
+	}
+
 	public async verifyCode(code: number) {
 		const record = await this.prisma.token.findFirst({
-			where: { code: +code, type: TokenType.VERIFICATION },
+			where: { code, type: TokenType.VERIFICATION },
 		});
 
 		if (!record) throw new NotFoundException('Invalid code');
