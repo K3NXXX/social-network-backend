@@ -1,117 +1,87 @@
-import { BadRequestException, forwardRef, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { v4 as uuidv4 } from "uuid";
-
-import { PrismaService } from "../../../common/prisma.service";
-import { TokenType, User } from "@prisma/client";
-import { Request } from "express";
-import { ConfirmationDto } from "./dto/confirmation.dto";
-import { MailService } from "src/common/mail/mail.service";
-import { UserService } from "src/modules/user/user.service";
-import { AuthService } from "../auth.service";
+import {
+	BadRequestException,
+	Injectable,
+	NotFoundException,
+} from '@nestjs/common';
+import { TokenType } from '@prisma/client';
+import { PrismaService } from '../../../common/prisma.service';
+import { MailService } from 'src/common/mail/mail.service';
+import { UserService } from 'src/modules/user/user.service';
+import { SignupDto, SignupMeta } from '../dto/auth.dto';
+import { hash } from 'bcrypt';
 
 @Injectable()
 export class EmailConfirmationService {
-  public constructor(
-    private readonly prismaService: PrismaService, 
-    private readonly mailService: MailService,
-    private readonly userService: UserService,
-    @Inject(forwardRef(() => AuthService))
-    private readonly authService: AuthService
-  ) {}
+	public constructor(
+		private readonly prisma: PrismaService,
+		private readonly mailService: MailService,
+		private readonly userService: UserService,
+	) {}
 
-  public async newVerification(req: Request, dto: ConfirmationDto) {
-    const existingToken = await this.prismaService.token.findUnique({
-      where: {
-        token: dto.token,
-        type: TokenType.VERIFICATION
-      }
-    })
+	private generateVerificationCode(): string {
+		return Math.floor(100000 + Math.random() * 900000).toString();
+	}
 
-    if(!existingToken) {
-      throw new NotFoundException(
-        'Token not found. Please make sure your token is correct.'
-      )
-    }
+	public async sendVerificationCode(dto: SignupDto) {
+		const code = this.generateVerificationCode();
+		const expiresIn = new Date(Date.now() + 15 * 60 * 1000);
 
-    const hasExpired = new Date(existingToken.expiresIn) < new Date()
+		const existing = await this.prisma.token.findFirst({
+			where: { email: dto.email, type: TokenType.VERIFICATION },
+		});
 
-    if(hasExpired) {
-      throw new BadRequestException(
-        'Verification token expired.'
-      )
-    }
+		if (existing)
+			await this.prisma.token.delete({ where: { id: existing.id } });
 
-    const existingUser = await this.userService.findByEmail(
-      existingToken.email
-    )
+		const hashedPassword = await hash(dto.password, 10);
 
-    if (!existingUser) {
-      throw new NotFoundException(
-        'User with this email was not found.'
-      )
-    }
+		const meta: SignupMeta = {
+			firstName: dto.firstName,
+			lastName: dto.lastName,
+			email: dto.email,
+			password: hashedPassword,
+		};
 
-    await this.prismaService.user.update({
-      where: {
-        id: existingUser.id
-      },
-      data: {
-        isVerified: true
-      }
-    })
+		await this.prisma.token.create({
+			data: {
+				email: dto.email,
+				code: +code,
+				expiresIn,
+				type: TokenType.VERIFICATION,
+				meta,
+			},
+		});
 
-    await this.prismaService.token.delete({
-      where: {
-        id: existingToken.id,
-        type: TokenType.VERIFICATION
-      }
-    })
+		await this.mailService.sendConfirmationCode(dto.email, +code);
+	}
 
-    /////////////////////////////////////////////
-  }
+	public async verifyCode(code: number) {
+		const record = await this.prisma.token.findFirst({
+			where: { code: +code, type: TokenType.VERIFICATION },
+		});
 
-  public async sendVerificationToken(user: User) {
-     const verificationToken = await this.generateVerificationToken(
-      user.email
-     )
+		if (!record) throw new NotFoundException('Invalid code');
+		if (new Date(record.expiresIn) < new Date())
+			throw new BadRequestException('Code expired');
 
-     await this.mailService.sendConfirmationEmail(
-      verificationToken.email,
-      verificationToken.token
-     )
+		const existingUser = await this.userService.findByEmail(record.email);
+		if (existingUser) throw new BadRequestException('User already verified');
 
-     return true
-  }
+		const dto = record.meta as SignupMeta;
 
-  private async generateVerificationToken(email: string) {
-    const token = uuidv4();
-    const expiresIn = new Date(new Date().getTime() + 3600 * 1000);
+		const user = await this.prisma.user.create({
+			data: {
+				firstName: dto.firstName,
+				lastName: dto.lastName,
+				email: dto.email,
+				password: dto.password,
+				isVerified: true,
+				lastLogin: new Date(),
+			},
+		});
 
-    const existingToken = await this.prismaService.token.findFirst({
-      where: {
-        email,
-        type: TokenType.VERIFICATION
-      }
-    })
+		await this.prisma.token.delete({ where: { id: record.id } });
 
-    if (existingToken) {
-      await this.prismaService.token.delete({
-        where: {
-          id: existingToken.id,
-          type: TokenType.VERIFICATION
-        }
-      })
-    }
-
-    const verificationToken = await this.prismaService.token.create({
-      data: {
-        email,
-        token,
-        expiresIn,
-        type: TokenType.VERIFICATION
-      }
-    })
-
-    return verificationToken
-    }
+		return user;
+	}
 }
