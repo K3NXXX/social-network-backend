@@ -22,7 +22,6 @@ export class AuthController {
 	@Post('register')
 	async register(@Body() dto: SignupDto) {
 		await this.authService.register(dto);
-
 		return {
 			message: 'Verification code sent to your email',
 		};
@@ -30,18 +29,26 @@ export class AuthController {
 
 	@Post('register/confirm')
 	async verifyCode(
-		@Body('code') code: number,
+		@Body('code') code: string,
 		@Res({ passthrough: true }) res: Response,
 	) {
-		const user = await this.emailConfirmationService.verifyCode(code);
+		const user = await this.emailConfirmationService.verifyCode(+code);
 
-		const tokens = this.authService.issueTokens(user.id);
+		const tokens = await this.authService.issueTokens(user.id);
 		this.authService.addRefreshToken(res, tokens.refreshToken);
 
 		return {
 			message: 'Account verified and registered successfully!',
 			user,
 			accessToken: tokens.accessToken,
+		};
+	}
+
+	@Post('register/resend')
+	async resendCode(@Body('email') email: string) {
+		await this.emailConfirmationService.resendVerificationCode(email);
+		return {
+			message: 'New verification code sent',
 		};
 	}
 

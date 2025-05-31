@@ -27,6 +27,10 @@ export class AuthService {
 			throw new BadRequestException('User with this email already exists');
 
 		await this.emailConfirmationService.sendVerificationCode(dto);
+
+		return {
+			message: 'Verification code sent to your email',
+		};
 	}
 
 	async login(dto: LoginDto) {
@@ -46,7 +50,7 @@ export class AuthService {
 		return user;
 	}
 
-	issueTokens(userId: string) {
+	async issueTokens(userId: string) {
 		const data = { id: userId };
 
 		const accessToken = this.jwt.sign(data, {
@@ -65,7 +69,7 @@ export class AuthService {
 		if (!result) throw new UnauthorizedException('Invalid refresh token');
 
 		const user = await this.userService.findById(result.id);
-		const tokens = this.issueTokens(user.id);
+		const tokens = await this.issueTokens(user.id);
 
 		return { user, ...tokens };
 	}
