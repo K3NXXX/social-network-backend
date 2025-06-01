@@ -1,8 +1,8 @@
 import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
+	BadRequestException,
+	ForbiddenException,
+	Injectable,
+	NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
@@ -10,115 +10,157 @@ import { CreatePostDto } from './dto/post.dto';
 
 @Injectable()
 export class PostService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly cloudinaryService: CloudinaryService,
-  ) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly cloudinaryService: CloudinaryService,
+	) {}
 
-  private readonly defaultPostInclude = {
-    user: {
-      select: {
-        firstName: true,
-        lastName: true,
-        username: true,
-        avatarUrl: true,
-      },
-    },
-    comments: {
-      select: {
-        id: true,
-        content: true,
-        user: {
-          select: {
-            firstName: true,
-            lastName: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        likes: {
-          select: {
-            id: true,
-          },
-        },
-        createdAt: true,
-      },
-    },
-    likes: true,
-  } as const;
+	async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
+		const hasContent = dto.content?.trim();
+		const hasFile = !!file;
 
-  async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
-    try {
-      let photo: string | undefined;
-      let photoPublicId: string | undefined;
+		if (!hasContent && !hasFile)
+			throw new BadRequestException('Post must contain content or image');
 
-      if (file) {
-        try {
-          const uploadResult = await this.cloudinaryService.uploadFile(file);
-          photoPublicId = uploadResult.public_id;
-          photo = uploadResult.secure_url;
-        } catch (error) {
-          throw new BadRequestException(error);
-        }
-      }
+		let photo: string | undefined;
+		let photoPublicId: string | undefined;
 
-      const post = await this.prisma.post.create({
-        data: {
-          content: dto.content,
-          photoPublicId: photoPublicId,
-          photo,
-          userId,
-        },
-        include: this.defaultPostInclude,
-      });
+		if (file) {
+			try {
+				const uploadResult = await this.cloudinaryService.uploadFile(file);
+				photo = uploadResult.secure_url;
+				photoPublicId = uploadResult.public_id;
+			} catch (error) {
+				throw new BadRequestException('Failed to upload image');
+			}
+		}
 
-      return post;
-    } catch (error) {
-      throw new BadRequestException(error);
-    }
-  }
+		const post = await this.prisma.post.create({
+			data: {
+				content: hasContent ? dto.content?.trim() : null,
+				photo,
+				photoPublicId,
+				userId,
+			},
+			include: this.defaultPostInclude,
+		});
 
-  async findAll() {
-    return this.prisma.post.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: this.defaultPostInclude,
-    });
-  }
+		return post;
+	}
 
-  async findOne(id: string) {
-    const post = await this.prisma.post.findUnique({
-      where: { id },
-      include: this.defaultPostInclude,
-    });
+	async findAll(page: number, take: number) {
+		const skip = (page - 1) * take;
 
-    if (!post) throw new NotFoundException('Post not found');
+		const [posts, total] = await Promise.all([
+			this.prisma.post.findMany({
+				skip,
+				take: take,
+				orderBy: { createdAt: 'desc' },
+				include: this.defaultPostInclude,
+			}),
+			this.prisma.post.count(),
+		]);
 
-    return post;
-  }
+		return {
+			data: posts,
+			total,
+			page,
+			lastPage: Math.ceil(total / take),
+		};
+	}
 
-  async findUserPosts(userId: string) {
-    return this.prisma.post.findMany({
-      where: { userId },
-      include: this.defaultPostInclude,
-    });
-  }
+	async findOne(id: string) {
+		const comment = await this.prisma.comment.findUnique({
+			where: { id },
+			include: {
+				user: {
+					select: {
+						id: true,
+						username: true,
+						firstName: true,
+						lastName: true,
+						avatarUrl: true,
+					},
+				},
+				_count: {
+					select: { likes: true },
+				},
+				replies: {
+					include: {
+						user: {
+							select: {
+								id: true,
+								username: true,
+								firstName: true,
+								lastName: true,
+								avatarUrl: true,
+							},
+						},
+						_count: {
+							select: { likes: true },
+						},
+					},
+				},
+			},
+		});
 
-  async remove(id: string, userId: string) {
-    const post = await this.prisma.post.findUnique({ where: { id } });
+		if (!comment) throw new NotFoundException('Comment not found');
 
-    if (!post) throw new NotFoundException('Post not found');
-    if (post.userId !== userId)
-      throw new ForbiddenException('You are not allowed to delete this post');
+		return comment;
+	}
 
-    if (post.photoPublicId) {
-      try {
-        await this.cloudinaryService.deleteFile(post.photoPublicId);
-      } catch (error) {
-        console.error('Cloudinary delete error:', error);
-      }
-    }
+	async findUserPosts(userId: string, page: number, take: number) {
+		const skip = (page - 1) * take;
 
-    await this.prisma.post.delete({ where: { id } });
-    return { message: 'Post deleted successfully' };
-  }
+		const [posts, total] = await Promise.all([
+			this.prisma.post.findMany({
+				where: { userId },
+				skip,
+				take: take,
+				orderBy: { createdAt: 'desc' },
+				include: this.defaultPostInclude,
+			}),
+			this.prisma.post.count({ where: { userId } }),
+		]);
+
+		return {
+			data: posts,
+			total,
+			page,
+			lastPage: Math.ceil(total / take),
+		};
+	}
+
+	async remove(id: string, userId: string) {
+		const post = await this.prisma.post.findUnique({ where: { id } });
+
+		if (!post) throw new NotFoundException('Post not found');
+		if (post.userId !== userId)
+			throw new ForbiddenException('You are not allowed to delete this post');
+
+		if (post.photoPublicId) {
+			try {
+				await this.cloudinaryService.deleteFile(post.photoPublicId);
+			} catch (error) {
+				console.error('Cloudinary delete error:', error);
+			}
+		}
+
+		await this.prisma.post.delete({ where: { id } });
+		return { message: 'Post deleted successfully' };
+	}
+
+	private readonly defaultPostInclude = {
+		user: {
+			select: {
+				firstName: true,
+				lastName: true,
+				username: true,
+				avatarUrl: true,
+			},
+		},
+		_count: {
+			select: { comments: true, likes: true },
+		},
+	} as const;
 }
