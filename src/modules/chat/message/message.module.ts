@@ -4,14 +4,16 @@ import { PrismaService } from '../../../common/prisma.service';
 import { ChatService } from '../chat.service';
 import { UserService } from '../../user/user.service';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
+import { MessageController } from './message.controller';
 
 @Module({
-  providers: [
-    MessageService,
-    PrismaService,
-    ChatService,
-    UserService,
-    CloudinaryService,
-  ],
+	controllers: [MessageController],
+	providers: [
+		MessageService,
+		PrismaService,
+		ChatService,
+		UserService,
+		CloudinaryService,
+	],
 })
 export class MessageModule {}
