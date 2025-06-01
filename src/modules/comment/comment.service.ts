@@ -49,29 +49,6 @@ export class CommentService {
 						avatarUrl: true,
 					},
 				},
-				_count: {
-					select: {
-						likes: true,
-					},
-				},
-				replies: {
-					include: {
-						user: {
-							select: {
-								id: true,
-								username: true,
-								firstName: true,
-								lastName: true,
-								avatarUrl: true,
-							},
-						},
-						_count: {
-							select: {
-								likes: true,
-							},
-						},
-					},
-				},
 			},
 		});
 
@@ -122,24 +99,6 @@ export class CommentService {
 				_count: {
 					select: {
 						likes: true,
-					},
-				},
-				replies: {
-					include: {
-						user: {
-							select: {
-								id: true,
-								username: true,
-								firstName: true,
-								lastName: true,
-								avatarUrl: true,
-							},
-						},
-						_count: {
-							select: {
-								likes: true,
-							},
-						},
 					},
 				},
 			},
