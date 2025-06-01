@@ -75,20 +75,19 @@ export class AuthService {
 	}
 
 	addRefreshToken(res: Response, refreshToken: string) {
-		const domain = this.configService.get('SERVER_DOMAIN');
 		res.cookie('refreshToken', refreshToken, {
 			httpOnly: true,
+			// domain: this.configService.get('SERVER_DOMAIN'),
 			expires: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
 			secure: true,
 			sameSite: 'lax',
-			...(domain ? { domain } : {}),
 		});
 	}
 
 	removeRefreshToken(res: Response) {
 		res.cookie('refreshToken', '', {
 			httpOnly: true,
-			domain: this.configService.get('SERVER_DOMAIN'),
+			// domain: this.configService.get('SERVER_DOMAIN'),
 			expires: new Date(0),
 			secure: true,
 			sameSite: 'lax',
