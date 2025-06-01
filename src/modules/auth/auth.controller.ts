@@ -34,7 +34,7 @@ export class AuthController {
 	) {
 		const user = await this.emailConfirmationService.verifyCode(+code);
 
-		const tokens = await this.authService.issueTokens(user.id);
+		const tokens = this.authService.issueTokens(user.id);
 		this.authService.addRefreshToken(res, tokens.refreshToken);
 
 		return {

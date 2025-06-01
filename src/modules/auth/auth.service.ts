@@ -50,7 +50,7 @@ export class AuthService {
 		return user;
 	}
 
-	async issueTokens(userId: string) {
+	issueTokens(userId: string) {
 		const data = { id: userId };
 
 		const accessToken = this.jwt.sign(data, {
@@ -69,7 +69,7 @@ export class AuthService {
 		if (!result) throw new UnauthorizedException('Invalid refresh token');
 
 		const user = await this.userService.findById(result.id);
-		const tokens = await this.issueTokens(user.id);
+		const tokens = this.issueTokens(user.id);
 
 		return { user, ...tokens };
 	}
