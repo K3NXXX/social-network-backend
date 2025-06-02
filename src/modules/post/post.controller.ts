@@ -1,12 +1,13 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  UploadedFile,
-  UseInterceptors,
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Param,
+	Post,
+	Query,
+	UploadedFile,
+	UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Authorization } from '../../common/decorators/auth.decorator';
@@ -16,38 +17,62 @@ import { PostService } from './post.service';
 
 @Controller('posts')
 export class PostController {
-  constructor(private readonly postService: PostService) {}
+	constructor(private readonly postService: PostService) {}
 
-  @Post()
-  @Authorization()
-  @UseInterceptors(FileInterceptor('file'))
-  create(
-    @Body() createPostDto: CreatePostDto,
-    @CurrentUser('id') userId: string,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    return this.postService.create(createPostDto, userId, file);
-  }
+	@Authorization()
+	@Post()
+	@UseInterceptors(FileInterceptor('file'))
+	create(
+		@CurrentUser('id') userId: string,
+		@Body() createPostDto: CreatePostDto,
+		@UploadedFile() file: Express.Multer.File,
+	) {
+		return this.postService.create(createPostDto, userId, file);
+	}
 
-  @Get()
-  findAll() {
-    return this.postService.findAll();
-  }
+	@Authorization()
+	@Get('feed')
+	getFeed(
+		@CurrentUser('id') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '10',
+	) {
+		return this.postService.getFeed(userId, +page, +take);
+	}
 
-  @Get('user')
-  @Authorization()
-  findUserPosts(@CurrentUser('id') userId: string) {
-    return this.postService.findUserPosts(userId);
-  }
+	@Authorization()
+	@Get('discover')
+	async discover(
+		@CurrentUser('id') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '10',
+	) {
+		return this.postService.getDiscover(userId, +page, +take);
+	}
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.postService.findOne(id);
-  }
+	@Get()
+	findAll(@Query('page') page = '1', @Query('take') take = '15') {
+		return this.postService.getAll(+page, +take);
+	}
 
-  @Delete(':id')
-  @Authorization()
-  remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.postService.remove(id, userId);
-  }
+	@Authorization()
+	@Get('user')
+	findUserPosts(
+		@CurrentUser('id') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '10',
+	) {
+		return this.postService.findUserPosts(userId, +page, +take);
+	}
+
+	@Get(':id')
+	findOne(@Param('id') id: string) {
+		return this.postService.findOne(id);
+	}
+
+	@Authorization()
+	@Delete(':id')
+	remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
+		return this.postService.remove(id, userId);
+	}
 }

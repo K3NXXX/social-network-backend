@@ -37,6 +37,19 @@ export class UserService {
 		});
 	}
 
+	async getAll() {
+		return this.prisma.user.findMany({
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				username: true,
+				email: true,
+				avatarUrl: true,
+			},
+		});
+	}
+
 	public async getProfile(id: string) {
 		const profile = await this.prisma.user.findUnique({
 			where: { id },

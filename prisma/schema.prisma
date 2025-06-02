@@ -120,7 +120,7 @@ model BlockedUser {
 
 model Post {
   id            String   @id @default(uuid())
-  content       String
+  content       String?
   privacy       Privacy? @default(PUBLIC)
   photo         String?
   photoPublicId String?
@@ -136,6 +136,8 @@ model Post {
   savedBy       SavedPost[]
   notifications Notification[]
 
+  @@index([userId])
+  @@index([createdAt])
   @@map("posts")
 }
 
@@ -159,6 +161,10 @@ model Comment {
   likes         Like[]
   notifications Notification[]
 
+  @@index([postId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([parentId])
   @@map("comments")
 }
 
