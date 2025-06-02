@@ -7,7 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../user/user.service';
 import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
+import { CookieOptions, Response } from 'express';
 import { LoginDto, SignupDto } from './dto/auth.dto';
 import { compare } from 'bcrypt';
 import { EmailConfirmationService } from './email-confirmation/email-confirmation.service';
@@ -75,22 +75,30 @@ export class AuthService {
 	}
 
 	addRefreshToken(res: Response, refreshToken: string) {
-		res.cookie('refreshToken', refreshToken, {
+		const cookieOptions: CookieOptions = {
 			httpOnly: true,
-			domain: this.configService.get('SERVER_DOMAIN'),
 			expires: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
 			secure: true,
 			sameSite: 'none',
-		});
+		};
+
+		const domain = this.configService.get('SERVER_DOMAIN');
+		if (domain) cookieOptions.domain = domain;
+
+		res.cookie('refreshToken', refreshToken, cookieOptions);
 	}
 
 	removeRefreshToken(res: Response) {
-		res.cookie('refreshToken', '', {
+		const cookieOptions: CookieOptions = {
 			httpOnly: true,
-			domain: this.configService.get('SERVER_DOMAIN'),
 			expires: new Date(0),
 			secure: true,
 			sameSite: 'none',
-		});
+		};
+
+		const domain = this.configService.get('SERVER_DOMAIN');
+		if (domain) cookieOptions.domain = domain;
+
+		res.cookie('refreshToken', cookieOptions);
 	}
 }
