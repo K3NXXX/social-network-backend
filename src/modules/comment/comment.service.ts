@@ -42,7 +42,6 @@ export class CommentService {
 			include: {
 				user: {
 					select: {
-						id: true,
 						username: true,
 						firstName: true,
 						lastName: true,
@@ -89,7 +88,6 @@ export class CommentService {
 			include: {
 				user: {
 					select: {
-						id: true,
 						username: true,
 						firstName: true,
 						lastName: true,
@@ -99,6 +97,7 @@ export class CommentService {
 				_count: {
 					select: {
 						likes: true,
+						replies: true,
 					},
 				},
 			},
@@ -125,7 +124,6 @@ export class CommentService {
 				include: {
 					user: {
 						select: {
-							id: true,
 							username: true,
 							firstName: true,
 							lastName: true,
@@ -135,6 +133,7 @@ export class CommentService {
 					_count: {
 						select: {
 							likes: true,
+							replies: true,
 						},
 					},
 				},
@@ -171,7 +170,6 @@ export class CommentService {
 				include: {
 					user: {
 						select: {
-							id: true,
 							username: true,
 							firstName: true,
 							lastName: true,
@@ -181,6 +179,7 @@ export class CommentService {
 					_count: {
 						select: {
 							likes: true,
+							replies: true,
 						},
 					},
 				},
