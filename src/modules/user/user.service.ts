@@ -140,36 +140,36 @@ export class UserService {
 	}
 
 	public async update(updateUserDto: UpdateUserDto, userId: string) {
-		const { currentPassword, newPassword, email, ...otherData } = updateUserDto;
-
+		const { currentPassword, newPassword, dateOfBirth, ...otherData } = updateUserDto;
+	
 		const user = await this.findById(userId);
-
+	
 		const isPasswordValid = await compare(currentPassword, user.password);
-		if (!isPasswordValid)
+		if (!isPasswordValid) {
 			throw new ConflictException('Current password is incorrect');
-
+		}
+	
 		let hashedPassword = user.password;
+	
 		if (newPassword) {
 			const salt = await genSalt(10);
 			hashedPassword = await hash(newPassword, salt);
 		}
-
+	
+		const dataToUpdate: Record<string, any> = {
+			...otherData,
+			password: hashedPassword,
+		};
+	
+		if (dateOfBirth !== undefined) {
+			dataToUpdate.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+		}
+	
 		const updatedUser = await this.prisma.user.update({
 			where: { id: user.id },
-			data: {
-				...otherData,
-				password: hashedPassword,
-				email: email?.trim(),
-				firstName: otherData.firstName?.trim(),
-				lastName: otherData.lastName?.trim(),
-				bio: otherData.bio,
-				location: otherData.location,
-				dateOfBirth: otherData.dateOfBirth
-					? new Date(otherData.dateOfBirth)
-					: undefined,
-			},
+			data: dataToUpdate,
 		});
-
+	
 		return updatedUser;
 	}
 
