@@ -30,9 +30,29 @@ export class PostController {
 		return this.postService.create(createPostDto, userId, file);
 	}
 
+	@Authorization()
+	@Get('feed')
+	getFeed(
+		@CurrentUser('id') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '10',
+	) {
+		return this.postService.getFeed(userId, +page, +take);
+	}
+
+	@Authorization()
+	@Get('discover')
+	async discover(
+		@CurrentUser('id') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '10',
+	) {
+		return this.postService.getDiscover(userId, +page, +take);
+	}
+
 	@Get()
 	findAll(@Query('page') page = '1', @Query('take') take = '15') {
-		return this.postService.findAll(+page, +take);
+		return this.postService.getAll(+page, +take);
 	}
 
 	@Authorization()

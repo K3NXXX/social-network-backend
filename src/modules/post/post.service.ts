@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
-import { CreatePostDto } from './dto/post.dto';
+import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
 
 @Injectable()
 export class PostService {
@@ -14,6 +14,23 @@ export class PostService {
 		private readonly prisma: PrismaService,
 		private readonly cloudinaryService: CloudinaryService,
 	) {}
+
+	private readonly defaultPostInclude = {
+		user: {
+			select: {
+				firstName: true,
+				lastName: true,
+				username: true,
+				avatarUrl: true,
+			},
+		},
+		_count: {
+			select: {
+				likes: true,
+				comments: true,
+			},
+		},
+	} as const;
 
 	async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
 		const hasContent = dto.content?.trim();
@@ -48,87 +65,22 @@ export class PostService {
 		return post;
 	}
 
-	async findAll(page: number, take: number) {
-		const skip = (page - 1) * take;
+	async update(id: string, dto: UpdatePostDto, userId: string) {
+		const post = await this.prisma.post.findUnique({ where: { id } });
 
-		const [posts, total] = await Promise.all([
-			this.prisma.post.findMany({
-				skip,
-				take: take,
-				orderBy: { createdAt: 'desc' },
-				include: this.defaultPostInclude,
-			}),
-			this.prisma.post.count(),
-		]);
+		if (!post) throw new NotFoundException('Post not found');
+		if (post.userId !== userId)
+			throw new ForbiddenException('You cannot update this post');
 
-		return {
-			data: posts,
-			total,
-			page,
-			lastPage: Math.ceil(total / take),
-		};
-	}
-
-	async findOne(id: string) {
-		const comment = await this.prisma.comment.findUnique({
+		const updated = await this.prisma.post.update({
 			where: { id },
-			include: {
-				user: {
-					select: {
-						id: true,
-						username: true,
-						firstName: true,
-						lastName: true,
-						avatarUrl: true,
-					},
-				},
-				_count: {
-					select: { likes: true },
-				},
-				replies: {
-					include: {
-						user: {
-							select: {
-								id: true,
-								username: true,
-								firstName: true,
-								lastName: true,
-								avatarUrl: true,
-							},
-						},
-						_count: {
-							select: { likes: true },
-						},
-					},
-				},
+			data: {
+				content: dto.content?.trim() ?? post.content,
 			},
+			include: this.defaultPostInclude,
 		});
 
-		if (!comment) throw new NotFoundException('Comment not found');
-
-		return comment;
-	}
-
-	async findUserPosts(userId: string, page: number, take: number) {
-		const skip = (page - 1) * take;
-
-		const [posts, total] = await Promise.all([
-			this.prisma.post.findMany({
-				where: { userId },
-				skip,
-				take: take,
-				orderBy: { createdAt: 'desc' },
-				include: this.defaultPostInclude,
-			}),
-			this.prisma.post.count({ where: { userId } }),
-		]);
-
-		return {
-			data: posts,
-			total,
-			page,
-			lastPage: Math.ceil(total / take),
-		};
+		return updated;
 	}
 
 	async remove(id: string, userId: string) {
@@ -150,17 +102,130 @@ export class PostService {
 		return { message: 'Post deleted successfully' };
 	}
 
-	private readonly defaultPostInclude = {
-		user: {
-			select: {
-				firstName: true,
-				lastName: true,
-				username: true,
-				avatarUrl: true,
+	async getAll(page: number, take: number) {
+		const skip = (page - 1) * take;
+
+		const [posts, total] = await Promise.all([
+			this.prisma.post.findMany({
+				skip,
+				take,
+				orderBy: [{ createdAt: 'desc' }],
+				include: this.defaultPostInclude,
+			}),
+			this.prisma.post.count(),
+		]);
+
+		return {
+			data: posts,
+			total,
+			page,
+			lastPage: Math.ceil(total / take),
+		};
+	}
+
+	async getDiscover(userId: string, page: number, take: number) {
+		const skip = (page - 1) * take;
+
+		const following = await this.prisma.follow.findMany({
+			where: { followerId: userId },
+			select: { followingId: true },
+		});
+		const followingIds = following.map(f => f.followingId);
+
+		const excludedIds = [...followingIds, userId];
+
+		const [posts, total] = await Promise.all([
+			this.prisma.post.findMany({
+				where: {
+					userId: { notIn: excludedIds },
+				},
+				skip,
+				take,
+				orderBy: [
+					{ likes: { _count: 'desc' } },
+					{ comments: { _count: 'desc' } },
+					{ createdAt: 'desc' },
+				],
+				include: this.defaultPostInclude,
+			}),
+			this.prisma.post.count({
+				where: { userId: { notIn: excludedIds } },
+			}),
+		]);
+
+		return {
+			data: posts,
+			total,
+			page,
+			lastPage: Math.ceil(total / take),
+		};
+	}
+
+	async findUserPosts(userId: string, page: number, take: number) {
+		const skip = (page - 1) * take;
+
+		const [posts, total] = await Promise.all([
+			this.prisma.post.findMany({
+				where: { userId },
+				skip,
+				take,
+				orderBy: { createdAt: 'desc' },
+				include: this.defaultPostInclude,
+			}),
+			this.prisma.post.count({ where: { userId } }),
+		]);
+
+		return {
+			data: posts,
+			total,
+			page,
+			lastPage: Math.ceil(total / take),
+		};
+	}
+
+	async findOne(id: string) {
+		const post = await this.prisma.post.findUnique({
+			where: { id },
+			include: {
+				...this.defaultPostInclude,
 			},
-		},
-		_count: {
-			select: { comments: true, likes: true },
-		},
-	} as const;
+		});
+
+		if (!post) throw new NotFoundException('Post not found');
+		return post;
+	}
+
+	async getFeed(userId: string, page: number, take: number) {
+		const skip = (page - 1) * take;
+
+		const following = await this.prisma.follow.findMany({
+			where: { followerId: userId },
+			select: { followingId: true },
+		});
+		const followingIds = following.map(f => f.followingId);
+
+		const allIds = [...followingIds, userId];
+
+		const [posts, total] = await Promise.all([
+			this.prisma.post.findMany({
+				where: {
+					userId: { in: allIds },
+				},
+				skip,
+				take,
+				orderBy: { createdAt: 'desc' },
+				include: this.defaultPostInclude,
+			}),
+			this.prisma.post.count({
+				where: { userId: { in: allIds } },
+			}),
+		]);
+
+		return {
+			data: posts,
+			total,
+			page,
+			lastPage: Math.ceil(total / take),
+		};
+	}
 }
