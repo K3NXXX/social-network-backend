@@ -15,23 +15,6 @@ export class PostService {
 		private readonly cloudinaryService: CloudinaryService,
 	) {}
 
-	private readonly defaultPostInclude = {
-		user: {
-			select: {
-				firstName: true,
-				lastName: true,
-				username: true,
-				avatarUrl: true,
-			},
-		},
-		_count: {
-			select: {
-				likes: true,
-				comments: true,
-			},
-		},
-	} as const;
-
 	async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
 		const hasContent = dto.content?.trim();
 		const hasFile = !!file;
@@ -54,30 +37,82 @@ export class PostService {
 
 		const post = await this.prisma.post.create({
 			data: {
-				content: hasContent ? dto.content?.trim() : null,
+				content: hasContent || null,
 				photo,
 				photoPublicId,
 				userId,
+				privacy: dto.privacy ?? 'PUBLIC',
 			},
-			include: this.defaultPostInclude,
+			select: this.defaultPost,
 		});
 
 		return post;
 	}
 
-	async update(id: string, dto: UpdatePostDto, userId: string) {
+	async update(
+		id: string,
+		userId: string,
+		dto: UpdatePostDto,
+		file?: Express.Multer.File,
+		removePhoto?: boolean,
+	) {
 		const post = await this.prisma.post.findUnique({ where: { id } });
 
 		if (!post) throw new NotFoundException('Post not found');
 		if (post.userId !== userId)
 			throw new ForbiddenException('You cannot update this post');
 
+		const wantsToRemovePhoto = !!removePhoto;
+		const newContent = dto.content?.trim();
+		const content =
+			dto.content !== undefined ? newContent || null : post.content;
+
+		let photo = post.photo;
+		let photoPublicId = post.photoPublicId;
+
+		if (wantsToRemovePhoto && post.photoPublicId) {
+			try {
+				await this.cloudinaryService.deleteFile(post.photoPublicId);
+				photo = null;
+				photoPublicId = null;
+			} catch (error) {
+				console.error('Failed to delete old image:', error);
+				throw new BadRequestException('Failed to delete image');
+			}
+		}
+
+		if (file) {
+			if (post.photoPublicId) {
+				try {
+					await this.cloudinaryService.deleteFile(post.photoPublicId);
+				} catch (error) {
+					console.warn('Could not delete old image before upload');
+				}
+			}
+
+			try {
+				const uploadResult = await this.cloudinaryService.uploadFile(file);
+				photo = uploadResult.secure_url;
+				photoPublicId = uploadResult.public_id;
+			} catch (error) {
+				throw new BadRequestException('Failed to upload image');
+			}
+		}
+
+		if (!content && !photo)
+			throw new BadRequestException(
+				'Post must contain at least content or image',
+			);
+
 		const updated = await this.prisma.post.update({
 			where: { id },
 			data: {
-				content: dto.content?.trim() ?? post.content,
+				content,
+				photo,
+				photoPublicId,
+				privacy: dto.privacy ?? post.privacy,
 			},
-			include: this.defaultPostInclude,
+			select: this.defaultPost,
 		});
 
 		return updated;
@@ -107,12 +142,19 @@ export class PostService {
 
 		const [posts, total] = await Promise.all([
 			this.prisma.post.findMany({
+				where: {
+					privacy: 'PUBLIC',
+				},
 				skip,
 				take,
 				orderBy: [{ createdAt: 'desc' }],
-				include: this.defaultPostInclude,
+				select: this.defaultPost,
 			}),
-			this.prisma.post.count(),
+			this.prisma.post.count({
+				where: {
+					privacy: 'PUBLIC',
+				},
+			}),
 		]);
 
 		return {
@@ -131,13 +173,13 @@ export class PostService {
 			select: { followingId: true },
 		});
 		const followingIds = following.map(f => f.followingId);
-
 		const excludedIds = [...followingIds, userId];
 
 		const [posts, total] = await Promise.all([
 			this.prisma.post.findMany({
 				where: {
 					userId: { notIn: excludedIds },
+					privacy: 'PUBLIC',
 				},
 				skip,
 				take,
@@ -146,10 +188,13 @@ export class PostService {
 					{ comments: { _count: 'desc' } },
 					{ createdAt: 'desc' },
 				],
-				include: this.defaultPostInclude,
+				select: this.defaultPost,
 			}),
 			this.prisma.post.count({
-				where: { userId: { notIn: excludedIds } },
+				where: {
+					userId: { notIn: excludedIds },
+					privacy: 'PUBLIC',
+				},
 			}),
 		]);
 
@@ -170,7 +215,7 @@ export class PostService {
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				include: this.defaultPostInclude,
+				select: this.defaultPost,
 			}),
 			this.prisma.post.count({ where: { userId } }),
 		]);
@@ -183,15 +228,20 @@ export class PostService {
 		};
 	}
 
-	async findOne(id: string) {
+	async findOne(id: string, currentUserId?: string) {
 		const post = await this.prisma.post.findUnique({
 			where: { id },
-			include: {
-				...this.defaultPostInclude,
-			},
+			select: this.defaultPost,
 		});
 
 		if (!post) throw new NotFoundException('Post not found');
+
+		const isOwner = post.user.id === currentUserId;
+		const isPublic = post.privacy === 'PUBLIC';
+
+		if (!isPublic && !isOwner)
+			throw new ForbiddenException('You are not allowed to view this post');
+
 		return post;
 	}
 
@@ -204,20 +254,22 @@ export class PostService {
 		});
 		const followingIds = following.map(f => f.followingId);
 
-		const allIds = [...followingIds, userId];
-
 		const [posts, total] = await Promise.all([
 			this.prisma.post.findMany({
 				where: {
-					userId: { in: allIds },
+					userId: { in: followingIds },
+					privacy: 'PUBLIC',
 				},
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				include: this.defaultPostInclude,
+				select: this.defaultPost,
 			}),
 			this.prisma.post.count({
-				where: { userId: { in: allIds } },
+				where: {
+					userId: { in: followingIds },
+					privacy: 'PUBLIC',
+				},
 			}),
 		]);
 
@@ -228,4 +280,28 @@ export class PostService {
 			lastPage: Math.ceil(total / take),
 		};
 	}
+
+	private readonly defaultPost = {
+		id: true,
+		content: true,
+		photo: true,
+		privacy: true,
+		createdAt: true,
+		updatedAt: true,
+		user: {
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				username: true,
+				avatarUrl: true,
+			},
+		},
+		_count: {
+			select: {
+				likes: true,
+				comments: true,
+			},
+		},
+	} as const;
 }
