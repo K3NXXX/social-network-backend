@@ -119,9 +119,9 @@ model BlockedUser {
 }
 
 model Post {
-  id            String   @id @default(uuid())
+  id            String  @id @default(uuid())
   content       String?
-  privacy       Privacy? @default(PUBLIC)
+  privacy       Privacy @default(PUBLIC)
   photo         String?
   photoPublicId String?
 
@@ -138,6 +138,9 @@ model Post {
 
   @@index([userId])
   @@index([createdAt])
+  @@index([userId, privacy])
+  @@index([privacy])
+  @@index([photoPublicId])
   @@map("posts")
 }
 
