@@ -6,9 +6,10 @@ import { PostModule } from '../post/post.module';
 import { PostService } from '../post/post.service';
 import { LikeController } from './like.controller';
 import { LikeService } from './like.service';
+import { NotificationModule } from '../notification/notification.module'
 
 @Module({
-  imports: [PostModule, CloudinaryModule],
+  imports: [PostModule, CloudinaryModule, NotificationModule],
   controllers: [LikeController],
   providers: [LikeService, PrismaService, PostService, CommentService],
 })

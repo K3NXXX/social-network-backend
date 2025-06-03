@@ -1,148 +1,268 @@
 import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
+	BadRequestException,
+	ConflictException,
+	Inject,
+	Injectable,
+	NotFoundException,
 } from '@nestjs/common';
 import { compare, genSalt, hash } from 'bcrypt';
 import { PrismaService } from '../../common/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { UpdateUserDto } from './dto/user.dto';
+import Redis from 'ioredis';
 
 @Injectable()
 export class UserService {
-  public constructor(
-    private readonly prismaService: PrismaService,
-    private readonly cloudinaryService: CloudinaryService,
-  ) {}
+	public constructor(
+		private readonly prisma: PrismaService,
+		private readonly cloudinaryService: CloudinaryService,
+		@Inject('REDIS_CLIENT') private readonly redis: Redis,
+	) {}
 
-  public async findById(id: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: { id },
-    });
+	private ONLINE_USERS_SET = 'online_users';
 
-    if (!user) throw new NotFoundException('User not found');
+	public async findById(id: string) {
+		const user = await this.prisma.user.findUnique({
+			where: { id },
+		});
 
-    return user;
-  }
+		if (!user) throw new NotFoundException('User not found');
 
-  public async findByEmail(email: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: { email },
-    });
+		return user;
+	}
 
-    return user;
-  }
+	public async findByEmail(email: string) {
+		return this.prisma.user.findUnique({
+			where: { email },
+		});
+	}
 
-  public async create(
-    firstName: string,
-    lastName: string,
-    email: string,
-    password: string,
-    confirmPassword: string,
-  ) {
-    const existingUser = await this.prismaService.user.findUnique({
-      where: { email },
-    });
+	async getAll() {
+		return this.prisma.user.findMany({
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				username: true,
+				email: true,
+				avatarUrl: true,
+			},
+		});
+	}
 
-    if (existingUser)
-      throw new ConflictException(`User with email ${email} already exists`);
+	public async getProfile(id: string) {
+		const profile = await this.prisma.user.findUnique({
+			where: { id },
+			include: {
+				posts: {
+					select: {
+						id: true,
+						content: true,
+						photo: true,
+						createdAt: true,
+					},
+				},
+			},
+		});
 
-    if (password !== confirmPassword)
-      throw new ConflictException('Passwords do not match');
+		if (!profile) throw new NotFoundException('User not found');
 
-    const salt = await genSalt(10);
-    password = await hash(password, salt);
+		const [followers, following] = await Promise.all([
+			this.prisma.follow.count({
+				where: { followingId: id },
+			}),
+			this.prisma.follow.count({
+				where: { followerId: id },
+			}),
+		]);
 
-    const user = await this.prismaService.user.create({
-      data: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email,
-        password,
-      },
-    });
+		return { ...profile, followers, following };
+	}
 
-    return user;
-  }
+	public async getOnlineFollows(userId: string) {
+		const following = await this.prisma.follow.findMany({
+			where: { followerId: userId },
+			select: { followingId: true },
+		});
 
-  public async update(updateUserDto: UpdateUserDto, userId: string) {
-    const { currentPassword, newPassword, email, ...otherData } = updateUserDto;
+		const followers = await this.prisma.follow.findMany({
+			where: { followingId: userId },
+			select: { followerId: true },
+		});
 
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-    });
+		const userIdsSet = new Set<string>();
+		following.forEach(f => userIdsSet.add(f.followingId));
+		followers.forEach(f => userIdsSet.add(f.followerId));
 
-    if (!user) throw new NotFoundException('User not found');
+		const allUserIds = Array.from(userIdsSet);
 
-    const isPasswordValid = await compare(currentPassword, user.password);
-    if (!isPasswordValid)
-      throw new ConflictException('Current password is incorrect');
+		if (allUserIds.length === 0) return [];
 
-    let hashedPassword = user.password;
-    if (newPassword) {
-      const salt = await genSalt(10);
-      hashedPassword = await hash(newPassword, salt);
-    }
+		const onlineUsers = await this.redis.smembers(this.ONLINE_USERS_SET);
+		const onlineFollowedIds = allUserIds.filter(id => onlineUsers.includes(id));
 
-    const updatedUser = await this.prismaService.user.update({
-      where: { id: user.id },
-      data: {
-        ...otherData,
-        password: hashedPassword,
-        email: email?.trim(),
-        firstName: otherData.firstName?.trim(),
-        lastName: otherData.lastName?.trim(),
-        bio: otherData.bio,
-        location: otherData.location,
-        dateOfBirth: otherData.dateOfBirth
-          ? new Date(otherData.dateOfBirth)
-          : undefined,
-      },
-    });
+		if (onlineFollowedIds.length === 0) return [];
 
-    return updatedUser;
-  }
+		const users = await this.prisma.user.findMany({
+			where: { id: { in: onlineFollowedIds } },
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				username: true,
+				avatarUrl: true,
+			},
+		});
 
-  public async uploadAvatar(file: Express.Multer.File, userId: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user) throw new NotFoundException('User not found');
+		return users;
+	}
 
-    if (!file) throw new BadRequestException('File is required');
+	async updateLastLogin(userId: string) {
+		await this.prisma.user.update({
+			where: { id: userId },
+			data: { lastLogin: new Date() },
+		});
+	}
 
-    const uploadResult = await this.cloudinaryService.uploadFile(file);
-    const avatarUrl = uploadResult.secure_url;
-    const avatarPublicId = uploadResult.public_id;
+	public async create(
+		firstName: string,
+		lastName: string,
+		email: string,
+		password: string,
+	) {
+		const existingUser = await this.prisma.user.findUnique({
+			where: { email },
+		});
 
-    const updatedUser = await this.prismaService.user.update({
-      where: { id: userId },
-      data: { avatarUrl, avatarPublicId: avatarPublicId },
-    });
+		if (existingUser)
+			throw new ConflictException(`User with email ${email} already exists`);
 
-    return updatedUser;
-  }
+		const salt = await genSalt(10);
+		password = await hash(password, salt);
 
-  public async deleteAvatar(userId: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user) throw new NotFoundException('User not found');
+		const user = await this.prisma.user.create({
+			data: {
+				firstName: firstName.trim(),
+				lastName: lastName.trim(),
+				email,
+				password,
+			},
+		});
 
-    if (user.avatarPublicId) {
-      try {
-        await this.cloudinaryService.deleteFile(user.avatarPublicId);
-      } catch (error) {
-        console.error('Cloudinary delete error:', error);
-      }
-    }
+		return user;
+	}
 
-    const updatedUser = await this.prismaService.user.update({
-      where: { id: userId },
-      data: { avatarUrl: null, avatarPublicId: null },
-    });
+	public async update(updateUserDto: UpdateUserDto, userId: string) {
+		const { currentPassword, newPassword, email, ...otherData } = updateUserDto;
 
-    return updatedUser;
-  }
+		const user = await this.findById(userId);
+
+		const isPasswordValid = await compare(currentPassword, user.password);
+		if (!isPasswordValid)
+			throw new ConflictException('Current password is incorrect');
+
+		let hashedPassword = user.password;
+		if (newPassword) {
+			const salt = await genSalt(10);
+			hashedPassword = await hash(newPassword, salt);
+		}
+
+		const updatedUser = await this.prisma.user.update({
+			where: { id: user.id },
+			data: {
+				...otherData,
+				password: hashedPassword,
+				email: email?.trim(),
+				firstName: otherData.firstName?.trim(),
+				lastName: otherData.lastName?.trim(),
+				bio: otherData.bio,
+				location: otherData.location,
+				dateOfBirth: otherData.dateOfBirth
+					? new Date(otherData.dateOfBirth)
+					: undefined,
+			},
+		});
+
+		return updatedUser;
+	}
+
+	public async uploadAvatar(file: Express.Multer.File, userId: string) {
+		await this.findById(userId);
+
+		if (!file) throw new BadRequestException('File is required');
+
+		const uploadResult = await this.cloudinaryService.uploadFile(file);
+		const avatarUrl = uploadResult.secure_url;
+		const avatarPublicId = uploadResult.public_id;
+
+		const updatedUser = await this.prisma.user.update({
+			where: { id: userId },
+			data: { avatarUrl, avatarPublicId: avatarPublicId },
+		});
+
+		return updatedUser;
+	}
+
+	public async deleteAvatar(userId: string) {
+		const user = await this.findById(userId);
+
+		if (user.avatarPublicId) {
+			try {
+				await this.cloudinaryService.deleteFile(user.avatarPublicId);
+			} catch (error) {
+				console.error('Cloudinary delete error:', error);
+			}
+		}
+
+		const updatedUser = await this.prisma.user.update({
+			where: { id: userId },
+			data: { avatarUrl: null, avatarPublicId: null },
+		});
+
+		return updatedUser;
+	}
+
+	public async search(query: string) {
+		if (!query?.trim()) return false;
+
+		const normalizedQuery = query.trim().toLowerCase();
+
+		const users = await this.prisma.user.findMany({
+			where: {
+				OR: [
+					{ firstName: { contains: normalizedQuery, mode: 'insensitive' } },
+					{ lastName: { contains: normalizedQuery, mode: 'insensitive' } },
+					{ username: { contains: normalizedQuery, mode: 'insensitive' } },
+				],
+			},
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				username: true,
+				avatarUrl: true,
+			},
+			orderBy: { firstName: 'asc' },
+		});
+
+		return users;
+	}
+
+	/// REDIS
+	async setUserOnline(userId: string): Promise<void> {
+		await this.redis.sadd(this.ONLINE_USERS_SET, userId);
+	}
+
+	async setUserOffline(userId: string): Promise<void> {
+		await this.redis.srem(this.ONLINE_USERS_SET, userId);
+	}
+
+	async isUserOnline(userId: string): Promise<boolean> {
+		const isMember = await this.redis.sismember(this.ONLINE_USERS_SET, userId);
+		return isMember === 1;
+	}
+
+	async getOnlineUsers(): Promise<string[]> {
+		return this.redis.smembers(this.ONLINE_USERS_SET);
+	}
 }
