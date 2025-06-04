@@ -165,6 +165,54 @@ export class PostService {
 		};
 	}
 
+	async getFeed(userId: string, page: number, take: number) {
+		const skip = (page - 1) * take;
+
+		const following = await this.prisma.follow.findMany({
+			where: { followerId: userId },
+			select: { followingId: true },
+		});
+		const followingIds = following.map(f => f.followingId);
+
+		const [posts, total] = await Promise.all([
+			this.prisma.post.findMany({
+				where: {
+					userId: { in: followingIds },
+					privacy: 'PUBLIC',
+				},
+				skip,
+				take,
+				orderBy: { createdAt: 'desc' },
+				select: {
+					...this.defaultPost,
+					likes: {
+						where: { userId },
+						select: { id: true },
+					},
+				},
+			}),
+			this.prisma.post.count({
+				where: {
+					userId: { in: followingIds },
+					privacy: 'PUBLIC',
+				},
+			}),
+		]);
+
+		const data = posts.map(post => ({
+			...post,
+			liked: post.likes.length > 0,
+			likes: undefined,
+		}));
+
+		return {
+			data,
+			total,
+			page,
+			lastPage: Math.ceil(total / take),
+		};
+	}
+
 	async getDiscover(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
@@ -188,7 +236,13 @@ export class PostService {
 					{ comments: { _count: 'desc' } },
 					{ createdAt: 'desc' },
 				],
-				select: this.defaultPost,
+				select: {
+					...this.defaultPost,
+					likes: {
+						where: { userId },
+						select: { id: true },
+					},
+				},
 			}),
 			this.prisma.post.count({
 				where: {
@@ -198,8 +252,14 @@ export class PostService {
 			}),
 		]);
 
+		const data = posts.map(post => ({
+			...post,
+			liked: post.likes.length > 0,
+			likes: undefined,
+		}));
+
 		return {
-			data: posts,
+			data,
 			total,
 			page,
 			lastPage: Math.ceil(total / take),
@@ -215,7 +275,13 @@ export class PostService {
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				select: this.defaultPost,
+				select: {
+					...this.defaultPost,
+					likes: {
+						where: { userId },
+						select: { id: true },
+					},
+				},
 			}),
 			this.prisma.post.count({ where: { userId } }),
 		]);
@@ -228,57 +294,27 @@ export class PostService {
 		};
 	}
 
-	async findOne(id: string, currentUserId?: string) {
+	async findOne(id: string, userId?: string) {
 		const post = await this.prisma.post.findUnique({
 			where: { id },
-			select: this.defaultPost,
+			select: {
+				...this.defaultPost,
+				likes: {
+					where: { userId },
+					select: { id: true },
+				},
+			},
 		});
 
 		if (!post) throw new NotFoundException('Post not found');
 
-		const isOwner = post.user.id === currentUserId;
+		const isOwner = post.user.id === userId;
 		const isPublic = post.privacy === 'PUBLIC';
 
 		if (!isPublic && !isOwner)
 			throw new ForbiddenException('You are not allowed to view this post');
 
 		return post;
-	}
-
-	async getFeed(userId: string, page: number, take: number) {
-		const skip = (page - 1) * take;
-
-		const following = await this.prisma.follow.findMany({
-			where: { followerId: userId },
-			select: { followingId: true },
-		});
-		const followingIds = following.map(f => f.followingId);
-
-		const [posts, total] = await Promise.all([
-			this.prisma.post.findMany({
-				where: {
-					userId: { in: followingIds },
-					privacy: 'PUBLIC',
-				},
-				skip,
-				take,
-				orderBy: { createdAt: 'desc' },
-				select: this.defaultPost,
-			}),
-			this.prisma.post.count({
-				where: {
-					userId: { in: followingIds },
-					privacy: 'PUBLIC',
-				},
-			}),
-		]);
-
-		return {
-			data: posts,
-			total,
-			page,
-			lastPage: Math.ceil(total / take),
-		};
 	}
 
 	private readonly defaultPost = {
