@@ -16,6 +16,7 @@ import { MailModule } from './common/mail/mail.module';
 import { EmailConfirmationModule } from './modules/auth/email-confirmation/email-confirmation.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { MessageModule } from './modules/chat/message/message.module';
+import { SavedPostsModule } from './modules/saved-posts/saved-posts.module';
 
 @Module({
 	imports: [
@@ -35,6 +36,7 @@ import { MessageModule } from './modules/chat/message/message.module';
 		BlockUserModule,
 		MailModule,
 		EmailConfirmationModule,
+		SavedPostsModule,
 	],
 	controllers: [AppController],
 	providers: [AppService, PrismaService],
