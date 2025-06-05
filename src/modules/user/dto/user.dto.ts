@@ -1,71 +1,43 @@
 import {
-  IsDateString,
-  IsEmail,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MinLength,
-  IsEnum,
+	IsDateString,
+	IsEnum,
+	IsNotEmpty,
+	IsOptional,
+	IsString,
 } from 'class-validator';
 import { Trim } from '../../../common/decorators/trim.decorator';
+import { Gender } from '@prisma/client';
 
-export enum Gender {
-  MALE = 'MALE',
-  FEMALE = 'FEMALE',
-  OTHER = 'OTHER',
-}
+export class UserDto {
+	@IsString()
+	@IsNotEmpty({ message: 'Current password is required' })
+	currentPassword: string;
 
-export class UpdateUserDto {
-  @Trim()
-  @IsString()
-  @IsOptional()
-  username?: string;
+	@Trim()
+	@IsString()
+	@IsOptional()
+	firstName?: string;
 
-  @Trim()
-  @IsOptional()
-  @IsEmail()
-  email?: string;
+	@Trim()
+	@IsString()
+	@IsOptional()
+	lastName?: string;
 
-  @IsString()
-  @IsOptional()
-  @MinLength(8, { message: 'New password must be at least 8 characters' })
-  newPassword?: string;
+	@IsDateString({}, { message: 'Date must be a valid ISO date' })
+	@IsOptional()
+	dateOfBirth?: string;
 
-  @IsString()
-  @IsNotEmpty()
-  currentPassword: string;
+	@IsEnum(Gender, { message: 'Gender must be one of the allowed values' })
+	@IsOptional()
+	gender?: Gender;
 
-  @Trim()
-  @IsString()
-  @IsOptional()
-  firstName?: string;
+	@Trim()
+	@IsString()
+	@IsOptional()
+	bio?: string;
 
-  @Trim()
-  @IsString()
-  @IsOptional()
-  lastName?: string;
-
-  @IsString()
-  @IsDateString()
-  @IsOptional()
-  dateOfBirth?: string;
-
-  @IsEnum(Gender)
-  @IsOptional()
-  gender?: Gender;
-
-  @Trim()
-  @IsString()
-  @IsOptional()
-  bio?: string;
-
-  @Trim()
-  @IsString()
-  @IsOptional()
-  location?: string;
-}
-
-export class UploadAvatarDto {
-  @IsString()
-  avatarUrl?: string;
+	@Trim()
+	@IsString()
+	@IsOptional()
+	location?: string;
 }
