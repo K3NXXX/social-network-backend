@@ -172,7 +172,9 @@ export class PostService {
 			where: { followerId: userId },
 			select: { followingId: true },
 		});
-		const followingIds = following.map(f => f.followingId);
+		const followingIds = [
+			...new Set([...following.map(f => f.followingId), userId]),
+		];
 
 		const [posts, total] = await Promise.all([
 			this.prisma.post.findMany({
@@ -183,13 +185,7 @@ export class PostService {
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				select: {
-					...this.defaultPost,
-					likes: {
-						where: { userId },
-						select: { id: true },
-					},
-				},
+				select: this.postSelect(userId),
 			}),
 			this.prisma.post.count({
 				where: {
@@ -199,11 +195,7 @@ export class PostService {
 			}),
 		]);
 
-		const data = posts.map(post => ({
-			...post,
-			liked: post.likes.length > 0,
-			likes: undefined,
-		}));
+		const data = this.postsWithLike(posts);
 
 		return {
 			data,
@@ -220,8 +212,9 @@ export class PostService {
 			where: { followerId: userId },
 			select: { followingId: true },
 		});
-		const followingIds = following.map(f => f.followingId);
-		const excludedIds = [...followingIds, userId];
+		const excludedIds = [
+			...new Set([...following.map(f => f.followingId), userId]),
+		];
 
 		const [posts, total] = await Promise.all([
 			this.prisma.post.findMany({
@@ -236,13 +229,7 @@ export class PostService {
 					{ comments: { _count: 'desc' } },
 					{ createdAt: 'desc' },
 				],
-				select: {
-					...this.defaultPost,
-					likes: {
-						where: { userId },
-						select: { id: true },
-					},
-				},
+				select: this.postSelect(userId),
 			}),
 			this.prisma.post.count({
 				where: {
@@ -252,11 +239,7 @@ export class PostService {
 			}),
 		]);
 
-		const data = posts.map(post => ({
-			...post,
-			liked: post.likes.length > 0,
-			likes: undefined,
-		}));
+		const data = this.postsWithLike(posts);
 
 		return {
 			data,
@@ -266,28 +249,29 @@ export class PostService {
 		};
 	}
 
-	async findUserPosts(userId: string, page: number, take: number) {
+	async findUserPosts(
+		authorId: string,
+		viewerId: string,
+		page: number,
+		take: number,
+	) {
 		const skip = (page - 1) * take;
 
 		const [posts, total] = await Promise.all([
 			this.prisma.post.findMany({
-				where: { userId },
+				where: { userId: authorId },
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				select: {
-					...this.defaultPost,
-					likes: {
-						where: { userId },
-						select: { id: true },
-					},
-				},
+				select: this.postSelect(viewerId),
 			}),
-			this.prisma.post.count({ where: { userId } }),
+			this.prisma.post.count({ where: { userId: authorId } }),
 		]);
 
+		const data = this.postsWithLike(posts);
+
 		return {
-			data: posts,
+			data,
 			total,
 			page,
 			lastPage: Math.ceil(total / take),
@@ -315,6 +299,22 @@ export class PostService {
 			throw new ForbiddenException('You are not allowed to view this post');
 
 		return post;
+	}
+
+	private postSelect = (userId: string) => ({
+		...this.defaultPost,
+		likes: {
+			where: { userId },
+			select: { id: true },
+		},
+	});
+
+	private postsWithLike(posts: any[]) {
+		return posts.map(post => ({
+			...post,
+			liked: post.likes.length > 0,
+			likes: undefined,
+		}));
 	}
 
 	private readonly defaultPost = {
