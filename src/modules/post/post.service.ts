@@ -249,23 +249,18 @@ export class PostService {
 		};
 	}
 
-	async findUserPosts(
-		authorId: string,
-		viewerId: string,
-		page: number,
-		take: number,
-	) {
+	async findUserPosts(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
 		const [posts, total] = await Promise.all([
 			this.prisma.post.findMany({
-				where: { userId: authorId },
+				where: { userId },
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				select: this.postSelect(viewerId),
+				select: this.postSelect(userId),
 			}),
-			this.prisma.post.count({ where: { userId: authorId } }),
+			this.prisma.post.count({ where: { userId } }),
 		]);
 
 		const data = this.postsWithLike(posts);
