@@ -12,9 +12,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Authorization } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
-import { UpdateUserDto } from './dto/user.dto';
+import { UserDto } from './dto/user.dto';
 import { UserService } from './user.service';
 import { FollowService } from '../follow/follow.service';
+import { AccountDto } from './dto/account.dto';
 
 @Controller('user')
 export class UserController {
@@ -26,11 +27,6 @@ export class UserController {
 	@Get()
 	async search(@Query('search') query: string) {
 		return this.userService.search(query);
-	}
-
-	@Get('all')
-	async getAll() {
-		return this.userService.getAll();
 	}
 
 	@Authorization()
@@ -63,22 +59,28 @@ export class UserController {
 	}
 
 	@Authorization()
-	@Patch('update')
-	async updateUser(
-		@Body() updateUserDto: UpdateUserDto,
+	@Patch('profile')
+	async updateProfile(@CurrentUser('id') userId: string, @Body() dto: UserDto) {
+		return this.userService.updateProfile(userId, dto);
+	}
+
+	@Authorization()
+	@Patch('account')
+	async updateAccount(
 		@CurrentUser('id') userId: string,
+		@Body() dto: AccountDto,
 	) {
-		return this.userService.update(updateUserDto, userId);
+		return this.userService.updateAccount(userId, dto);
 	}
 
 	@Authorization()
 	@Patch('update/avatar')
 	@UseInterceptors(FileInterceptor('file'))
 	async uploadAvatar(
-		@UploadedFile() file: Express.Multer.File,
 		@CurrentUser('id') userId: string,
+		@UploadedFile() file: Express.Multer.File,
 	) {
-		return this.userService.uploadAvatar(file, userId);
+		return this.userService.uploadAvatar(userId, file);
 	}
 
 	@Authorization()
