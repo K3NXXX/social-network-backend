@@ -121,7 +121,7 @@ export class UserService {
 		});
 	}
 
-	async updateProfile(dto: UserDto, userId: string) {
+	async updateProfile(userId: string, dto: UserDto) {
 		const { currentPassword, dateOfBirth, ...other } = dto;
 
 		const user = await this.findById(userId);
@@ -143,7 +143,7 @@ export class UserService {
 		return true;
 	}
 
-	async updateAccount(dto: AccountDto, userId: string) {
+	async updateAccount(userId: string, dto: AccountDto) {
 		const user = await this.findById(userId);
 
 		const isValid = await compare(dto.currentPassword, user.password);
