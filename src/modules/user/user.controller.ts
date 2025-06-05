@@ -61,7 +61,7 @@ export class UserController {
 	@Authorization()
 	@Patch('profile')
 	async updateProfile(@CurrentUser('id') userId: string, @Body() dto: UserDto) {
-		return this.userService.updateProfile(dto, userId);
+		return this.userService.updateProfile(userId, dto);
 	}
 
 	@Authorization()
@@ -70,7 +70,7 @@ export class UserController {
 		@CurrentUser('id') userId: string,
 		@Body() dto: AccountDto,
 	) {
-		return this.userService.updateAccount(dto, userId);
+		return this.userService.updateAccount(userId, dto);
 	}
 
 	@Authorization()

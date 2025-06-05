@@ -48,7 +48,6 @@ export class UserService {
 
 	async getProfile(id: string) {
 		const profile = await this.findById(id);
-
 		if (!profile) throw new NotFoundException('User not found');
 
 		const [followers, following, posts] = await Promise.all([
