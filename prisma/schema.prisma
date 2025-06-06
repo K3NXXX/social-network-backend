@@ -40,6 +40,7 @@ enum TokenType {
   VERIFICATION
   TWO_FACTOR
   PASSWORD_RESET
+  EMAIL_CHANGE
 }
 
 // Rest of the schema remains unchanged since it was already in English
