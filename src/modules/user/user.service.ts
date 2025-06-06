@@ -13,6 +13,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { UserDto } from './dto/user.dto';
 import Redis from 'ioredis';
 import { AccountDto } from './dto/account.dto';
+import { EmailService } from '../auth/email/email.service';
 
 @Injectable()
 export class UserService {
@@ -28,6 +29,7 @@ export class UserService {
 
 	constructor(
 		private readonly prisma: PrismaService,
+		private emailService: EmailService,
 		private readonly cloudinaryService: CloudinaryService,
 		@Inject('REDIS_CLIENT') private readonly redis: Redis,
 	) {}
@@ -121,14 +123,10 @@ export class UserService {
 		});
 	}
 
-	async updateProfile(dto: UserDto, userId: string) {
-		const { currentPassword, dateOfBirth, ...other } = dto;
+	async updateProfile(userId: string, dto: UserDto) {
+		const { dateOfBirth, ...other } = dto;
 
 		const user = await this.findById(userId);
-		const isPasswordValid = await compare(currentPassword, user.password);
-
-		if (!isPasswordValid)
-			throw new ConflictException('Current password is incorrect');
 
 		const data: Record<string, any> = { ...other };
 
@@ -143,16 +141,19 @@ export class UserService {
 		return true;
 	}
 
-	async updateAccount(dto: AccountDto, userId: string) {
+	async updateAccount(userId: string, dto: AccountDto) {
 		const user = await this.findById(userId);
-
-		const isValid = await compare(dto.currentPassword, user.password);
-		if (!isValid)
-			throw new UnauthorizedException('Current password is incorrect');
 
 		const updateData: Record<string, any> = {};
 
 		if (dto.newPassword) {
+			if (!dto.currentPassword)
+				throw new BadRequestException('Current password is required');
+
+			const isValid = await compare(dto.currentPassword, user.password);
+			if (!isValid)
+				throw new UnauthorizedException('Current password is incorrect');
+
 			const isSame = await compare(dto.newPassword, user.password);
 			if (isSame)
 				throw new BadRequestException(
@@ -161,6 +162,19 @@ export class UserService {
 
 			const salt = await genSalt(10);
 			updateData.password = await hash(dto.newPassword, salt);
+		}
+
+		if (dto.newEmail) {
+			try {
+				await this.emailService.sendEmailChangeCode(userId, dto.newEmail);
+			} catch (error) {
+				this.logger.error('Failed to send email change code', error);
+				throw new BadRequestException('Failed to send email change code');
+			}
+
+			return {
+				message: 'Verification code sent to your email',
+			};
 		}
 
 		if (dto.newUsername) {

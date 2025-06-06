@@ -5,6 +5,7 @@ import {
 	Get,
 	Param,
 	Patch,
+	Post,
 	Query,
 	UploadedFile,
 	UseInterceptors,
@@ -16,12 +17,14 @@ import { UserDto } from './dto/user.dto';
 import { UserService } from './user.service';
 import { FollowService } from '../follow/follow.service';
 import { AccountDto } from './dto/account.dto';
+import { EmailService } from '../auth/email/email.service';
 
 @Controller('user')
 export class UserController {
 	constructor(
 		private readonly userService: UserService,
 		private readonly followService: FollowService,
+		private readonly emailService: EmailService,
 	) {}
 
 	@Get()
@@ -71,6 +74,12 @@ export class UserController {
 		@Body() dto: AccountDto,
 	) {
 		return this.userService.updateAccount(userId, dto);
+	}
+
+	@Authorization()
+	@Post('account/email')
+	async updateEmail(@Body('code') code: string) {
+		return this.emailService.confirmEmailChange(+code);
 	}
 
 	@Authorization()

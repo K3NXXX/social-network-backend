@@ -1,18 +1,8 @@
-import {
-	IsDateString,
-	IsEnum,
-	IsNotEmpty,
-	IsOptional,
-	IsString,
-} from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import { Trim } from '../../../common/decorators/trim.decorator';
 import { Gender } from '@prisma/client';
 
 export class UserDto {
-	@IsString()
-	@IsNotEmpty({ message: 'Current password is required' })
-	currentPassword: string;
-
 	@Trim()
 	@IsString()
 	@IsOptional()
