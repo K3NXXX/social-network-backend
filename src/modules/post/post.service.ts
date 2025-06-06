@@ -142,7 +142,7 @@ export class PostService {
 		return { message: 'Post deleted successfully' };
 	}
 
-	async getAll(page: number, take: number) {
+	async getAll(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
 		const [posts, total] = await Promise.all([
@@ -161,6 +161,26 @@ export class PostService {
 				},
 			}),
 		]);
+
+		if (userId) {
+			const postsWithLike = await Promise.all(
+				posts.map(async post => {
+					const likedByUser = await this.likeService.hasLikedPost(
+						userId,
+						post.id,
+					);
+					return { ...post, liked: likedByUser };
+				}),
+			);
+
+			return {
+				data: postsWithLike,
+				total,
+				page,
+				take,
+				totalPages: Math.ceil(total / take),
+			};
+		}
 
 		return {
 			data: posts,
@@ -203,7 +223,7 @@ export class PostService {
 		if (userId) {
 			const postsWithLike = await Promise.all(
 				posts.map(async post => {
-					const likedByUser = await this.likeService.hasLikedComment(
+					const likedByUser = await this.likeService.hasLikedPost(
 						userId,
 						post.id,
 					);
@@ -265,7 +285,7 @@ export class PostService {
 		if (userId) {
 			const postsWithLike = await Promise.all(
 				posts.map(async post => {
-					const likedByUser = await this.likeService.hasLikedComment(
+					const likedByUser = await this.likeService.hasLikedPost(
 						userId,
 						post.id,
 					);
@@ -307,7 +327,7 @@ export class PostService {
 		if (userId) {
 			const postsWithLike = await Promise.all(
 				posts.map(async post => {
-					const likedByUser = await this.likeService.hasLikedComment(
+					const likedByUser = await this.likeService.hasLikedPost(
 						userId,
 						post.id,
 					);
@@ -353,7 +373,7 @@ export class PostService {
 			throw new ForbiddenException('You are not allowed to view this post');
 
 		if (userId) {
-			const likedByUser = await this.likeService.hasLikedComment(userId, id);
+			const likedByUser = await this.likeService.hasLikedPost(userId, id);
 			return { ...post, liked: likedByUser };
 		}
 

@@ -34,7 +34,7 @@ export class PostController {
 	@Authorization()
 	@UseInterceptors(FileInterceptor('file'))
 	@Patch(':id')
-	async update(
+	update(
 		@CurrentUser('id') userId: string,
 		@Param('id') id: string,
 		@UploadedFile() file: Express.Multer.File,
@@ -55,7 +55,7 @@ export class PostController {
 
 	@Authorization()
 	@Get('discover')
-	async discover(
+	discover(
 		@CurrentUser('id') userId: string,
 		@Query('page') page = '1',
 		@Query('take') take = '10',
@@ -64,8 +64,12 @@ export class PostController {
 	}
 
 	@Get()
-	findAll(@Query('page') page = '1', @Query('take') take = '15') {
-		return this.postService.getAll(+page, +take);
+	findAll(
+		@CurrentUser('id') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '15',
+	) {
+		return this.postService.getAll(userId, +page, +take);
 	}
 
 	@Authorization()
@@ -89,7 +93,7 @@ export class PostController {
 
 	@Authorization()
 	@Get(':id')
-	async getPost(@CurrentUser('id') userId: string, @Param('id') id: string) {
+	getPost(@CurrentUser('id') userId: string, @Param('id') id: string) {
 		return this.postService.findOne(id, userId);
 	}
 
