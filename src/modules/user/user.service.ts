@@ -232,7 +232,7 @@ export class UserService {
 			},
 		});
 
-		return true;
+		return { photo: user.avatarUrl };
 	}
 
 	async deleteAvatar(userId: string) {
