@@ -10,13 +10,13 @@ import { AuthService } from './auth.service';
 import { LoginDto, SignupDto } from './dto/auth.dto';
 import { Request, Response } from 'express';
 import { Authorization } from '../../common/decorators/auth.decorator';
-import { EmailConfirmationService } from './email-confirmation/email-confirmation.service';
+import { EmailService } from './email/email.service';
 
 @Controller('auth')
 export class AuthController {
 	constructor(
 		private readonly authService: AuthService,
-		private emailConfirmationService: EmailConfirmationService,
+		private emailService: EmailService,
 	) {}
 
 	@Post('register')
@@ -32,7 +32,7 @@ export class AuthController {
 		@Body('code') code: string,
 		@Res({ passthrough: true }) res: Response,
 	) {
-		const user = await this.emailConfirmationService.verifyCode(+code);
+		const user = await this.emailService.confirmCode(+code);
 
 		const tokens = this.authService.issueTokens(user.id);
 		this.authService.addRefreshToken(res, tokens.refreshToken);
@@ -46,7 +46,7 @@ export class AuthController {
 
 	@Post('register/resend')
 	async resendCode(@Body('email') email: string) {
-		await this.emailConfirmationService.resendVerificationCode(email);
+		await this.emailService.resendConfirmationCode(email);
 		return {
 			message: 'New verification code sent',
 		};
