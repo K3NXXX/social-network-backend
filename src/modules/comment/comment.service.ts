@@ -1,6 +1,8 @@
 import {
 	BadRequestException,
 	ForbiddenException,
+	forwardRef,
+	Inject,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
@@ -9,6 +11,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationsGateway } from '../notification/notifications.gateway';
 import { CommentDto } from './dto/comment.dto';
+import { LikeService } from '../like/like.service';
 
 @Injectable()
 export class CommentService {
@@ -16,9 +19,11 @@ export class CommentService {
 		private readonly prisma: PrismaService,
 		private readonly notification: NotificationService,
 		private readonly notificationsGateway: NotificationsGateway,
+		@Inject(forwardRef(() => LikeService))
+		private readonly likeService: LikeService,
 	) {}
 
-	async create(dto: CommentDto, userId: string) {
+	async create(userId: string, dto: CommentDto) {
 		const { postId, content, parentId } = dto;
 
 		const post = await this.prisma.post.findUnique({ where: { id: postId } });
@@ -82,110 +87,108 @@ export class CommentService {
 		return comment;
 	}
 
-	async findOne(id: string) {
+	async findOne(id: string, userId: string) {
 		const comment = await this.prisma.comment.findUnique({
 			where: { id },
-			include: {
-				user: {
-					select: {
-						username: true,
-						firstName: true,
-						lastName: true,
-						avatarUrl: true,
-					},
-				},
-				_count: {
-					select: {
-						likes: true,
-						replies: true,
-					},
-				},
-			},
+			select: this.defaultComment,
 		});
 
 		if (!comment) throw new NotFoundException('Comment not found');
 
+		if (userId) {
+			const likedByUser = await this.likeService.hasLikedComment(userId, id);
+			return { ...comment, liked: likedByUser };
+		}
+
 		return comment;
 	}
 
-	async findAllForPost(postId: string, page: number, take: number) {
+	async findAllForPost(
+		postId: string,
+		userId: string,
+		page: number,
+		take: number,
+	) {
 		const post = await this.prisma.post.findUnique({ where: { id: postId } });
 		if (!post) throw new NotFoundException('Post not found');
 
-		const [comments, total] = await this.prisma.$transaction([
+		const [comments, total] = await Promise.all([
 			this.prisma.comment.findMany({
-				where: {
-					postId,
-					parentId: null,
-				},
+				where: { postId },
 				orderBy: { createdAt: 'desc' },
 				skip: (page - 1) * take,
-				take: take,
-				include: {
-					user: {
-						select: {
-							username: true,
-							firstName: true,
-							lastName: true,
-							avatarUrl: true,
-						},
-					},
-					_count: {
-						select: {
-							likes: true,
-							replies: true,
-						},
-					},
-				},
+				take,
+				select: this.defaultComment,
 			}),
 			this.prisma.comment.count({
-				where: {
-					postId,
-					parentId: null,
-				},
+				where: { postId },
 			}),
 		]);
+
+		if (userId) {
+			const commentsWithLike = await Promise.all(
+				comments.map(async reply => {
+					const likedByUser = await this.likeService.hasLikedComment(
+						userId,
+						reply.id,
+					);
+					return { ...reply, liked: likedByUser };
+				}),
+			);
+
+			return {
+				data: commentsWithLike,
+				total,
+				page,
+				take,
+				totalPages: Math.ceil(total / take),
+			};
+		}
 
 		return {
 			data: comments,
 			total,
 			page,
-			take,
-			totalPages: Math.ceil(total / take),
+			lastPage: Math.ceil(total / take),
 		};
 	}
 
-	async findReplies(parentId: string, page: number, take: number) {
+	async findReplies(id: string, userId: string, page: number, take: number) {
 		const parent = await this.prisma.comment.findUnique({
-			where: { id: parentId },
+			where: { id: id },
 		});
 		if (!parent) throw new NotFoundException('Parent comment not found');
 
-		const [replies, total] = await this.prisma.$transaction([
+		const [replies, total] = await Promise.all([
 			this.prisma.comment.findMany({
-				where: { parentId },
+				where: { id },
 				orderBy: { createdAt: 'asc' },
 				skip: (page - 1) * take,
-				take: take,
-				include: {
-					user: {
-						select: {
-							username: true,
-							firstName: true,
-							lastName: true,
-							avatarUrl: true,
-						},
-					},
-					_count: {
-						select: {
-							likes: true,
-							replies: true,
-						},
-					},
-				},
+				take,
+				select: this.defaultComment,
 			}),
-			this.prisma.comment.count({ where: { parentId } }),
+			this.prisma.comment.count({ where: { id } }),
 		]);
+
+		if (userId) {
+			const repliesWithLike = await Promise.all(
+				replies.map(async reply => {
+					const likedByUser = await this.likeService.hasLikedComment(
+						userId,
+						reply.id,
+					);
+					return { ...reply, liked: likedByUser };
+				}),
+			);
+
+			return {
+				data: repliesWithLike,
+				total,
+				page,
+				take,
+				totalPages: Math.ceil(total / take),
+			};
+		}
 
 		return {
 			data: replies,
@@ -227,4 +230,27 @@ export class CommentService {
 
 		return { message: 'Comment deleted successfully' };
 	}
+
+	private readonly defaultComment = {
+		id: true,
+		content: true,
+		parentId: true,
+		createdAt: true,
+		updatedAt: true,
+		user: {
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				username: true,
+				avatarUrl: true,
+			},
+		},
+		_count: {
+			select: {
+				likes: true,
+				replies: true,
+			},
+		},
+	} as const;
 }
