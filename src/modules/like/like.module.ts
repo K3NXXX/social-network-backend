@@ -1,16 +1,17 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { CloudinaryModule } from '../cloudinary/cloudinary.module';
-import { CommentService } from '../comment/comment.service';
 import { PostModule } from '../post/post.module';
-import { PostService } from '../post/post.service';
 import { LikeController } from './like.controller';
 import { LikeService } from './like.service';
-import { NotificationModule } from '../notification/notification.module'
+import { NotificationModule } from '../notification/notification.module';
+import { CommentModule } from '../comment/comment.module';
+import { PostService } from '../post/post.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Module({
-  imports: [PostModule, CloudinaryModule, NotificationModule],
-  controllers: [LikeController],
-  providers: [LikeService, PrismaService, PostService, CommentService],
+	imports: [PostModule, forwardRef(() => CommentModule), NotificationModule],
+	controllers: [LikeController],
+	providers: [LikeService, PrismaService, CloudinaryService, PostService],
+	exports: [LikeService],
 })
 export class LikeModule {}

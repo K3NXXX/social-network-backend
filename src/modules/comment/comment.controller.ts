@@ -19,45 +19,50 @@ export class CommentController {
 
 	@Post()
 	@Authorization()
-	createComment(@Body() dto: CommentDto, @CurrentUser('id') userId: string) {
-		return this.commentService.create(dto, userId);
+	createComment(@CurrentUser('id') userId: string, @Body() dto: CommentDto) {
+		return this.commentService.create(userId, dto);
 	}
 
+	@Authorization()
 	@Get('post/:postId')
 	findAllForPost(
 		@Param('postId') postId: string,
+		@CurrentUser('id') userId: string,
 		@Query('page') page = '1',
 		@Query('take') take = '15',
 	) {
-		return this.commentService.findAllForPost(postId, +page, +take);
+		return this.commentService.findAllForPost(postId, userId, +page, +take);
 	}
 
+	@Authorization()
 	@Get(':id/replies')
 	findReplies(
 		@Param('id') id: string,
+		@CurrentUser('id') userId: string,
 		@Query('page') page = '1',
 		@Query('take') take = '5',
 	) {
-		return this.commentService.findReplies(id, +page, +take);
+		return this.commentService.findReplies(id, userId, +page, +take);
 	}
 
-	@Get(':id')
-	findOne(@Param('id') id: string) {
-		return this.commentService.findOne(id);
-	}
-
-	@Patch(':id')
 	@Authorization()
+	@Get(':id')
+	findOne(@Param('id') id: string, @CurrentUser('id') userId: string) {
+		return this.commentService.findOne(id, userId);
+	}
+
+	@Authorization()
+	@Patch(':id')
 	update(
 		@Param('id') id: string,
-		@Body() dto: UpdateCommentDto,
 		@CurrentUser('id') userId: string,
+		@Body() dto: UpdateCommentDto,
 	) {
 		return this.commentService.update(id, userId, dto.content as string);
 	}
 
-	@Delete(':id')
 	@Authorization()
+	@Delete(':id')
 	remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
 		return this.commentService.remove(id, userId);
 	}
