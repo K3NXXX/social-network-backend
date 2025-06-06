@@ -1,196 +1,230 @@
 import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
+	BadRequestException,
+	ForbiddenException,
+	Injectable,
+	NotFoundException,
 } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationsGateway } from '../notification/notifications.gateway';
 import { CommentDto } from './dto/comment.dto';
 
 @Injectable()
 export class CommentService {
-  constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly notification: NotificationService,
+		private readonly notificationsGateway: NotificationsGateway,
+	) {}
 
-  async create(dto: CommentDto, userId: string) {
-    const { postId, content, parentId } = dto;
+	async create(dto: CommentDto, userId: string) {
+		const { postId, content, parentId } = dto;
 
-    const post = await this.prisma.post.findUnique({ where: { id: postId } });
-    if (!post) throw new NotFoundException('Post not found');
+		const post = await this.prisma.post.findUnique({ where: { id: postId } });
+		if (!post) throw new NotFoundException('Post not found');
 
-    if (parentId) {
-      const parentComment = await this.prisma.comment.findUnique({
-        where: { id: parentId },
-      });
-      if (!parentComment || parentComment.postId !== postId)
-        throw new BadRequestException('Invalid parent comment');
-    }
+		if (parentId) {
+			const parentComment = await this.prisma.comment.findUnique({
+				where: { id: parentId },
+			});
+			if (!parentComment || parentComment.postId !== postId)
+				throw new BadRequestException('Invalid parent comment');
+		}
 
-    const comment = await this.prisma.comment.create({
-      data: {
-        content,
-        postId,
-        userId,
-        parentId,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-        likes: true,
-        replies: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                avatarUrl: true,
-              },
-            },
-            likes: true,
-          },
-        },
-      },
-    });
+		const comment = await this.prisma.comment.create({
+			data: {
+				content,
+				postId,
+				userId,
+				parentId,
+			},
+			include: {
+				user: {
+					select: {
+						username: true,
+						firstName: true,
+						lastName: true,
+						avatarUrl: true,
+					},
+				},
+			},
+		});
 
-    return comment;
-  }
+		if (post.userId !== userId) {
+			const sender = await this.prisma.user.findUnique({
+				where: { id: userId },
+				select: { username: true, firstName: true, lastName: true },
+			});
 
-  async findOne(id: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-        likes: true,
-        replies: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                avatarUrl: true,
-              },
-            },
-            likes: true,
-          },
-        },
-      },
-    });
+			const username = sender?.username
+				? sender.username
+				: ((sender?.firstName ?? '') + ' ' + (sender?.lastName ?? '')).trim() ||
+					'Someone';
 
-    if (!comment) throw new NotFoundException('Comment not found');
+			await this.notification.create({
+				type: NotificationType.COMMENT,
+				message: `${username} commented your post`,
+				userId: post.userId,
+				senderId: userId,
+				postId,
+				commentId: comment.id,
+			});
 
-    return comment;
-  }
+			this.notificationsGateway.sendNotification(post.userId, {
+				type: NotificationType.COMMENT,
+				message: `${username} commented your post`,
+				postId,
+				senderId: userId,
+			});
+		}
 
-  async findAllForPost(postId: string) {
-    const post = await this.prisma.post.findUnique({ where: { id: postId } });
-    if (!post) throw new NotFoundException('Post not found');
+		return comment;
+	}
 
-    return this.prisma.comment.findMany({
-      where: {
-        postId,
-        parentId: null,
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-        likes: true,
-        replies: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                avatarUrl: true,
-              },
-            },
-            likes: true,
-          },
-        },
-      },
-    });
-  }
+	async findOne(id: string) {
+		const comment = await this.prisma.comment.findUnique({
+			where: { id },
+			include: {
+				user: {
+					select: {
+						username: true,
+						firstName: true,
+						lastName: true,
+						avatarUrl: true,
+					},
+				},
+				_count: {
+					select: {
+						likes: true,
+						replies: true,
+					},
+				},
+			},
+		});
 
-  async findReplies(parentId: string) {
-    const parent = await this.prisma.comment.findUnique({
-      where: { id: parentId },
-    });
-    if (!parent) throw new NotFoundException('Parent comment not found');
+		if (!comment) throw new NotFoundException('Comment not found');
 
-    return this.prisma.comment.findMany({
-      where: { parentId },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            avatarUrl: true,
-          },
-        },
-        likes: true,
-      },
-    });
-  }
+		return comment;
+	}
 
-  async update(id: string, userId: string, content: string) {
-    const comment = await this.prisma.comment.findUnique({ where: { id } });
+	async findAllForPost(postId: string, page: number, take: number) {
+		const post = await this.prisma.post.findUnique({ where: { id: postId } });
+		if (!post) throw new NotFoundException('Post not found');
 
-    if (!comment) throw new NotFoundException('Comment not found');
-    if (comment.userId !== userId)
-      throw new ForbiddenException('You can only edit your own comments');
+		const [comments, total] = await this.prisma.$transaction([
+			this.prisma.comment.findMany({
+				where: {
+					postId,
+					parentId: null,
+				},
+				orderBy: { createdAt: 'desc' },
+				skip: (page - 1) * take,
+				take: take,
+				include: {
+					user: {
+						select: {
+							username: true,
+							firstName: true,
+							lastName: true,
+							avatarUrl: true,
+						},
+					},
+					_count: {
+						select: {
+							likes: true,
+							replies: true,
+						},
+					},
+				},
+			}),
+			this.prisma.comment.count({
+				where: {
+					postId,
+					parentId: null,
+				},
+			}),
+		]);
 
-    return this.prisma.comment.update({
-      where: { id },
-      data: { content },
-    });
-  }
+		return {
+			data: comments,
+			total,
+			page,
+			take,
+			totalPages: Math.ceil(total / take),
+		};
+	}
 
-  async remove(id: string, userId: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id },
-      include: { replies: true },
-    });
+	async findReplies(parentId: string, page: number, take: number) {
+		const parent = await this.prisma.comment.findUnique({
+			where: { id: parentId },
+		});
+		if (!parent) throw new NotFoundException('Parent comment not found');
 
-    if (!comment) throw new NotFoundException('Comment not found');
-    if (comment.userId !== userId)
-      throw new ForbiddenException('You can only delete your own comments');
+		const [replies, total] = await this.prisma.$transaction([
+			this.prisma.comment.findMany({
+				where: { parentId },
+				orderBy: { createdAt: 'asc' },
+				skip: (page - 1) * take,
+				take: take,
+				include: {
+					user: {
+						select: {
+							username: true,
+							firstName: true,
+							lastName: true,
+							avatarUrl: true,
+						},
+					},
+					_count: {
+						select: {
+							likes: true,
+							replies: true,
+						},
+					},
+				},
+			}),
+			this.prisma.comment.count({ where: { parentId } }),
+		]);
 
-    await this.prisma.comment.deleteMany({
-      where: { parentId: comment.id },
-    });
+		return {
+			data: replies,
+			total,
+			page,
+			take,
+			totalPages: Math.ceil(total / take),
+		};
+	}
 
-    await this.prisma.comment.delete({ where: { id: comment.id } });
+	async update(id: string, userId: string, content: string) {
+		const comment = await this.prisma.comment.findUnique({ where: { id } });
 
-    return { message: 'Comment deleted successfully' };
-  }
+		if (!comment) throw new NotFoundException('Comment not found');
+		if (comment.userId !== userId)
+			throw new ForbiddenException('You can only edit your own comments');
+
+		return this.prisma.comment.update({
+			where: { id },
+			data: { content },
+		});
+	}
+
+	async remove(id: string, userId: string) {
+		const comment = await this.prisma.comment.findUnique({
+			where: { id },
+			include: { replies: true },
+		});
+
+		if (!comment) throw new NotFoundException('Comment not found');
+		if (comment.userId !== userId)
+			throw new ForbiddenException('You can only delete your own comments');
+
+		await this.prisma.comment.deleteMany({
+			where: { parentId: comment.id },
+		});
+
+		await this.prisma.comment.delete({ where: { id: comment.id } });
+
+		return { message: 'Comment deleted successfully' };
+	}
 }

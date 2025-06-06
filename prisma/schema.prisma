@@ -1,29 +1,29 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
 }
 
 // Status is responsible for the ability to block a user
 enum Status {
   ACTIVE
-  INACTIVE
+  BLOCKED
 }
 
 // Post privacy setting
 enum Privacy {
   PUBLIC
   PRIVATE
-}
-
-// Friend request status
-enum FriendStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
 }
 
 // Notification type
@@ -35,6 +35,14 @@ enum NotificationType {
   NEW_FOLLOWER
 }
 
+// Token type for email verification, two-factor authentication, and password reset
+enum TokenType {
+  VERIFICATION
+  TWO_FACTOR
+  PASSWORD_RESET
+  EMAIL_CHANGE
+}
+
 // Rest of the schema remains unchanged since it was already in English
 model User {
   id        String  @id @default(uuid())
@@ -44,28 +52,23 @@ model User {
   firstName String
   lastName  String
 
-  dateOfBirth DateTime?
-  gender      String?
-
-  avatarUrl String?
+  dateOfBirth    DateTime?
+  gender         Gender?   @default(OTHER)
+  avatarUrl      String?
   avatarPublicId String?
-  bio       String?
-  location  String?
+  bio            String?
+  location       String?
 
-  isOnline      Boolean   @default(false)
-  lastLogin     DateTime?
-  amountOfPosts Int       @default(0)
+  isOnline  Boolean   @default(false) @map("is_online")
+  lastLogin DateTime? @map("last_login")
 
   isActive   Status  @default(ACTIVE)
   isVerified Boolean @default(false) @map("is_verified")
 
-  posts      Post[]
-  comments   Comment[]
-  likes      Like[]
-  savedPosts SavedPost[]
-
-  sentFriendRequests     Friendship[] @relation("SentFriendRequests")
-  receivedFriendRequests Friendship[] @relation("ReceivedFriendRequests")
+  posts    Post[]
+  comments Comment[]
+  likes    Like[]
+  saved    SavedPost[]
 
   followers Follow[] @relation("Followers")
   following Follow[] @relation("Following")
@@ -73,8 +76,12 @@ model User {
   notifications     Notification[] @relation("UserNotifications")
   sentNotifications Notification[] @relation("NotificationSender")
 
-  sentMessages     Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
+  chats              Chat[]            @relation("Chats")
+  chatParticipations ChatParticipant[]
+  sentMessages       Message[]         @relation("SentMessages")
+
+  blockedUsers   BlockedUser[] @relation("Blocker")
+  blockedByUsers BlockedUser[] @relation("Blocked")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -82,12 +89,42 @@ model User {
   @@map("users")
 }
 
+model Token {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  code      Int
+  type      TokenType
+  expiresIn DateTime  @map("expires_in")
+  meta      Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, type])
+  @@index([code, type])
+  @@map("tokens")
+}
+
+model BlockedUser {
+  id String @id @default(uuid())
+
+  blockerId String
+  blocker   User   @relation("Blocker", fields: [blockerId], references: [id])
+
+  blockedId String
+  blocked   User   @relation("Blocked", fields: [blockedId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([blockerId, blockedId])
+  @@map("blocked_users")
+}
+
 model Post {
-  id      String   @id @default(uuid())
-  content String
-  privacy Privacy? @default(PUBLIC)
-  photo   String?
-  photoPublicId   String? 
+  id            String  @id @default(uuid())
+  content       String?
+  privacy       Privacy @default(PUBLIC)
+  photo         String?
+  photoPublicId String?
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -100,6 +137,11 @@ model Post {
   savedBy       SavedPost[]
   notifications Notification[]
 
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, privacy])
+  @@index([privacy])
+  @@index([photoPublicId])
   @@map("posts")
 }
 
@@ -111,7 +153,7 @@ model Comment {
   user   User   @relation(fields: [userId], references: [id])
 
   postId String
-  post   Post   @relation(fields: [postId], references: [id])
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   parentId String?
   parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
@@ -123,6 +165,10 @@ model Comment {
   likes         Like[]
   notifications Notification[]
 
+  @@index([postId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([parentId])
   @@map("comments")
 }
 
@@ -142,6 +188,8 @@ model Like {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  notifications Notification[]
+
   @@unique([userId, postId])
   @@unique([userId, commentId])
   @@map("likes")
@@ -160,24 +208,9 @@ model SavedPost {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
   @@map("saved_posts")
-}
-
-model Friendship {
-  id     String       @id @default(uuid())
-  status FriendStatus @default(PENDING)
-
-  senderId String
-  sender   User   @relation("SentFriendRequests", fields: [senderId], references: [id])
-
-  receiverId String
-  receiver   User   @relation("ReceivedFriendRequests", fields: [receiverId], references: [id])
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@unique([senderId, receiverId])
-  @@map("friendships")
 }
 
 model Follow {
@@ -200,7 +233,7 @@ model Notification {
   id      String           @id @default(uuid())
   type    NotificationType
   message String
-  isRead  Boolean          @default(false)
+  isRead  Boolean          @default(false) @map("is_read")
 
   userId String
   user   User   @relation("UserNotifications", fields: [userId], references: [id])
@@ -211,6 +244,9 @@ model Notification {
   postId String?
   post   Post?   @relation(fields: [postId], references: [id])
 
+  likeId String?
+  like   Like?   @relation(fields: [likeId], references: [id])
+
   commentId String?
   comment   Comment? @relation(fields: [commentId], references: [id])
 
@@ -220,19 +256,57 @@ model Notification {
   @@map("notifications")
 }
 
-model Message {
+model Chat {
   id      String  @id @default(uuid())
-  content String
-  isRead  Boolean @default(false)
+  name    String?
+  isGroup Boolean @default(false)
 
-  senderId String
-  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+  creatorId String
+  creator   User   @relation("Chats", fields: [creatorId], references: [id])
 
-  receiverId String
-  receiver   User   @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  participants ChatParticipant[]
+  messages     Message[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([updatedAt])
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id])
+
+  joinedAt DateTime  @default(now()) @map("joined_at")
+  leftAt   DateTime? @map("left_at")
+
+  @@unique([userId, chatId])
+  @@index([chatId])
+  @@index([userId])
+  @@map("chat_participants")
+}
+
+model Message {
+  id       String  @id @default(uuid())
+  content  String?
+  imageUrl String?
+  isRead   Boolean @default(false) @map("is_read")
+
+  senderId String
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([chatId, createdAt])
   @@map("messages")
 }
