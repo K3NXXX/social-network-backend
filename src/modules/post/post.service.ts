@@ -1,18 +1,23 @@
 import {
 	BadRequestException,
 	ForbiddenException,
+	forwardRef,
+	Inject,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
+import { LikeService } from '../like/like.service';
 
 @Injectable()
 export class PostService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly cloudinaryService: CloudinaryService,
+		@Inject(forwardRef(() => LikeService))
+		private readonly likeService: LikeService,
 	) {}
 
 	async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
@@ -185,7 +190,7 @@ export class PostService {
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				select: this.postSelect(userId),
+				select: this.defaultPost,
 			}),
 			this.prisma.post.count({
 				where: {
@@ -195,10 +200,28 @@ export class PostService {
 			}),
 		]);
 
-		const data = this.postsWithLike(posts);
+		if (userId) {
+			const postsWithLike = await Promise.all(
+				posts.map(async post => {
+					const likedByUser = await this.likeService.hasLikedComment(
+						userId,
+						post.id,
+					);
+					return { ...post, liked: likedByUser };
+				}),
+			);
+
+			return {
+				data: postsWithLike,
+				total,
+				page,
+				take,
+				totalPages: Math.ceil(total / take),
+			};
+		}
 
 		return {
-			data,
+			data: posts,
 			total,
 			page,
 			lastPage: Math.ceil(total / take),
@@ -229,7 +252,7 @@ export class PostService {
 					{ comments: { _count: 'desc' } },
 					{ createdAt: 'desc' },
 				],
-				select: this.postSelect(userId),
+				select: this.defaultPost,
 			}),
 			this.prisma.post.count({
 				where: {
@@ -239,10 +262,28 @@ export class PostService {
 			}),
 		]);
 
-		const data = this.postsWithLike(posts);
+		if (userId) {
+			const postsWithLike = await Promise.all(
+				posts.map(async post => {
+					const likedByUser = await this.likeService.hasLikedComment(
+						userId,
+						post.id,
+					);
+					return { ...post, liked: likedByUser };
+				}),
+			);
+
+			return {
+				data: postsWithLike,
+				total,
+				page,
+				take,
+				totalPages: Math.ceil(total / take),
+			};
+		}
 
 		return {
-			data,
+			data: posts,
 			total,
 			page,
 			lastPage: Math.ceil(total / take),
@@ -258,15 +299,33 @@ export class PostService {
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				select: this.postSelect(userId),
+				select: this.defaultPost,
 			}),
 			this.prisma.post.count({ where: { userId } }),
 		]);
 
-		const data = this.postsWithLike(posts);
+		if (userId) {
+			const postsWithLike = await Promise.all(
+				posts.map(async post => {
+					const likedByUser = await this.likeService.hasLikedComment(
+						userId,
+						post.id,
+					);
+					return { ...post, liked: likedByUser };
+				}),
+			);
+
+			return {
+				data: postsWithLike,
+				total,
+				page,
+				take,
+				totalPages: Math.ceil(total / take),
+			};
+		}
 
 		return {
-			data,
+			data: posts,
 			total,
 			page,
 			lastPage: Math.ceil(total / take),
@@ -293,23 +352,12 @@ export class PostService {
 		if (!isPublic && !isOwner)
 			throw new ForbiddenException('You are not allowed to view this post');
 
+		if (userId) {
+			const likedByUser = await this.likeService.hasLikedComment(userId, id);
+			return { ...post, liked: likedByUser };
+		}
+
 		return post;
-	}
-
-	private postSelect = (userId: string) => ({
-		...this.defaultPost,
-		likes: {
-			where: { userId },
-			select: { id: true },
-		},
-	});
-
-	private postsWithLike(posts: any[]) {
-		return posts.map(post => ({
-			...post,
-			liked: post.likes.length > 0,
-			likes: undefined,
-		}));
 	}
 
 	private readonly defaultPost = {
