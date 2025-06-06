@@ -1,10 +1,4 @@
-import {
-	IsEmail,
-	IsNotEmpty,
-	IsOptional,
-	IsString,
-	MinLength,
-} from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 import { Trim } from '../../../common/decorators/trim.decorator';
 
 export class AccountDto {
@@ -23,7 +17,7 @@ export class AccountDto {
 	@MinLength(3)
 	newUsername?: string;
 
+	@IsOptional()
 	@IsString()
-	@IsNotEmpty()
 	currentPassword: string;
 }

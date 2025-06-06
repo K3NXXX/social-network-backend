@@ -1,5 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
-import { EmailConfirmationService } from './email-confirmation.service';
+import { EmailService } from './email.service';
 import { MailModule } from 'src/common/mail/mail.module';
 import { AuthModule } from '../auth.module';
 import { UserService } from 'src/modules/user/user.service';
@@ -8,11 +8,16 @@ import { PrismaService } from '../../../common/prisma.service';
 import { AuthService } from '../auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
+import { UserModule } from '../../user/user.module';
 
 @Module({
-	imports: [MailModule, forwardRef(() => AuthModule)],
+	imports: [
+		MailModule,
+		forwardRef(() => AuthModule),
+		forwardRef(() => UserModule),
+	],
 	providers: [
-		EmailConfirmationService,
+		EmailService,
 		UserService,
 		MailService,
 		PrismaService,
@@ -20,6 +25,6 @@ import { CloudinaryService } from '../../cloudinary/cloudinary.service';
 		CloudinaryService,
 		JwtService,
 	],
-	exports: [EmailConfirmationService],
+	exports: [EmailService],
 })
-export class EmailConfirmationModule {}
+export class EmailModule {}

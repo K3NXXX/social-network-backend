@@ -1,5 +1,7 @@
 import {
 	BadRequestException,
+	forwardRef,
+	Inject,
 	Injectable,
 	NotFoundException,
 	UnauthorizedException,
@@ -10,15 +12,16 @@ import { ConfigService } from '@nestjs/config';
 import { CookieOptions, Response } from 'express';
 import { LoginDto, SignupDto } from './dto/auth.dto';
 import { compare } from 'bcrypt';
-import { EmailConfirmationService } from './email-confirmation/email-confirmation.service';
+import { EmailService } from './email/email.service';
 
 @Injectable()
 export class AuthService {
 	constructor(
 		private jwt: JwtService,
-		private userService: UserService,
 		private configService: ConfigService,
-		private emailConfirmationService: EmailConfirmationService,
+		private emailService: EmailService,
+		@Inject(forwardRef(() => UserService))
+		private readonly userService: UserService,
 	) {}
 
 	async register(dto: SignupDto) {
@@ -26,7 +29,7 @@ export class AuthService {
 		if (existing)
 			throw new BadRequestException('User with this email already exists');
 
-		await this.emailConfirmationService.sendVerificationCode(dto);
+		await this.emailService.sendConfirmationCode(dto);
 
 		return {
 			message: 'Verification code sent to your email',
