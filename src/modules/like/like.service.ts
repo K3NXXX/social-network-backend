@@ -10,11 +10,12 @@ import { PostService } from '../post/post.service';
 export class LikeService {
 	constructor(
 		private readonly prisma: PrismaService,
+		private readonly notification: NotificationService,
+		private readonly notificationsGateway: NotificationsGateway,
+		@Inject(forwardRef(() => PostService))
 		private readonly post: PostService,
 		@Inject(forwardRef(() => CommentService))
 		private readonly comment: CommentService,
-		private readonly notification: NotificationService,
-		private readonly notificationsGateway: NotificationsGateway,
 	) {}
 
 	async togglePostLike(postId: string, userId: string) {

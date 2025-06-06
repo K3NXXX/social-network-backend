@@ -9,7 +9,11 @@ import { PostService } from '../post/post.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Module({
-	imports: [PostModule, forwardRef(() => CommentModule), NotificationModule],
+	imports: [
+		forwardRef(() => PostModule),
+		forwardRef(() => CommentModule),
+		NotificationModule,
+	],
 	controllers: [LikeController],
 	providers: [LikeService, PrismaService, CloudinaryService, PostService],
 	exports: [LikeService],
