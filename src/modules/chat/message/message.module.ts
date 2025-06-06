@@ -5,6 +5,8 @@ import { ChatService } from '../chat.service';
 import { UserService } from '../../user/user.service';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
 import { MessageController } from './message.controller';
+import { EmailService } from '../../auth/email/email.service';
+import { MailService } from '../../../common/mail/mail.service';
 
 @Module({
 	controllers: [MessageController],
@@ -14,6 +16,8 @@ import { MessageController } from './message.controller';
 		ChatService,
 		UserService,
 		CloudinaryService,
+		EmailService,
+		MailService,
 	],
 })
 export class MessageModule {}

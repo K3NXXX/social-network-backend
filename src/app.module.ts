@@ -13,7 +13,7 @@ import { FollowModule } from './modules/follow/follow.module';
 import { BlockUserModule } from './modules/block-user/block-user.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { MailModule } from './common/mail/mail.module';
-import { EmailConfirmationModule } from './modules/auth/email-confirmation/email-confirmation.module';
+import { EmailModule } from './modules/auth/email/email.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { MessageModule } from './modules/chat/message/message.module';
 import { SavedPostsModule } from './modules/saved-posts/saved-posts.module';
@@ -35,7 +35,7 @@ import { SavedPostsModule } from './modules/saved-posts/saved-posts.module';
 		NotificationModule,
 		BlockUserModule,
 		MailModule,
-		EmailConfirmationModule,
+		EmailModule,
 		SavedPostsModule,
 	],
 	controllers: [AppController],
