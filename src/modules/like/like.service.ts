@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { CommentService } from '../comment/comment.service';
@@ -11,6 +11,7 @@ export class LikeService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly post: PostService,
+		@Inject(forwardRef(() => CommentService))
 		private readonly comment: CommentService,
 		private readonly notification: NotificationService,
 		private readonly notificationsGateway: NotificationsGateway,
@@ -20,18 +21,11 @@ export class LikeService {
 		const post = await this.post.findOne(postId);
 		if (!post) throw new Error('Post not found');
 
-		const existing = await this.prisma.like.findUnique({
-			where: {
-				userId_postId: {
-					userId,
-					postId,
-				},
-			},
-		});
+		const liked = await this.hasLikedPost(userId, postId);
 
-		if (existing) {
+		if (liked) {
 			await this.prisma.like.delete({
-				where: { id: existing.id },
+				where: { userId_postId: { userId, postId } },
 			});
 			return { liked: false };
 		}
@@ -75,21 +69,14 @@ export class LikeService {
 	}
 
 	async toggleCommentLike(commentId: string, userId: string) {
-		const comment = await this.comment.findOne(commentId);
+		const comment = await this.comment.findOne(commentId, userId);
 		if (!comment) throw new Error('Comment not found');
 
-		const existing = await this.prisma.like.findUnique({
-			where: {
-				userId_commentId: {
-					userId,
-					commentId,
-				},
-			},
-		});
+		const liked = await this.hasLikedComment(userId, commentId);
 
-		if (existing) {
+		if (liked) {
 			await this.prisma.like.delete({
-				where: { id: existing.id },
+				where: { userId_commentId: { userId, commentId } },
 			});
 			return { liked: false };
 		}
@@ -104,13 +91,23 @@ export class LikeService {
 		return { liked: true };
 	}
 
-	async getPostLikesCount(postId: string) {
-		const count = await this.prisma.like.count({ where: { postId } });
-		return { postId, likes: count };
+	async hasLikedPost(userId: string, postId: string): Promise<boolean> {
+		const existing = await this.prisma.like.findUnique({
+			where: {
+				userId_postId: { userId, postId },
+			},
+			select: { id: true },
+		});
+		return !!existing;
 	}
 
-	async getCommentLikesCount(commentId: string) {
-		const count = await this.prisma.like.count({ where: { commentId } });
-		return { commentId, likes: count };
+	async hasLikedComment(userId: string, commentId: string): Promise<boolean> {
+		const existing = await this.prisma.like.findUnique({
+			where: {
+				userId_commentId: { userId, commentId },
+			},
+			select: { id: true },
+		});
+		return !!existing;
 	}
 }
