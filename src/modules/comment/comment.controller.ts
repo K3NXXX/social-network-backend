@@ -17,8 +17,8 @@ import { CommentDto, UpdateCommentDto } from './dto/comment.dto';
 export class CommentController {
 	constructor(private readonly commentService: CommentService) {}
 
-	@Post()
 	@Authorization()
+	@Post()
 	createComment(@CurrentUser('id') userId: string, @Body() dto: CommentDto) {
 		return this.commentService.create(userId, dto);
 	}
