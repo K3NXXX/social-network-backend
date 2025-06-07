@@ -1,23 +1,20 @@
 import {
 	BadRequestException,
 	ForbiddenException,
-	forwardRef,
-	Inject,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { LikeService } from '../like/like.service';
+import { FollowService } from '../follow/follow.service';
 
 @Injectable()
 export class PostService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly cloudinaryService: CloudinaryService,
-		@Inject(forwardRef(() => LikeService))
-		private readonly likeService: LikeService,
+		private readonly followService: FollowService,
 	) {}
 
 	async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
@@ -59,7 +56,6 @@ export class PostService {
 		userId: string,
 		dto: UpdatePostDto,
 		file?: Express.Multer.File,
-		removePhoto?: boolean,
 	) {
 		const post = await this.prisma.post.findUnique({ where: { id } });
 
@@ -67,36 +63,20 @@ export class PostService {
 		if (post.userId !== userId)
 			throw new ForbiddenException('You cannot update this post');
 
-		const wantsToRemovePhoto = !!removePhoto;
-		const newContent = dto.content?.trim();
-		const content =
-			dto.content !== undefined ? newContent || null : post.content;
+		const content = dto.content?.trim() ?? post.content;
 
 		let photo = post.photo;
 		let photoPublicId = post.photoPublicId;
 
-		if (wantsToRemovePhoto && post.photoPublicId) {
-			try {
-				await this.cloudinaryService.deleteFile(post.photoPublicId);
-				photo = null;
-				photoPublicId = null;
-			} catch (error) {
-				console.error('Failed to delete old image:', error);
-				throw new BadRequestException('Failed to delete image');
-			}
-		}
-
 		if (file) {
-			if (post.photoPublicId) {
-				try {
-					await this.cloudinaryService.deleteFile(post.photoPublicId);
-				} catch (error) {
-					console.warn('Could not delete old image before upload');
-				}
-			}
-
 			try {
 				const uploadResult = await this.cloudinaryService.uploadFile(file);
+
+				if (post.photoPublicId)
+					this.cloudinaryService.deleteFile(post.photoPublicId).catch(() => {
+						console.warn('Could not delete old image after upload');
+					});
+
 				photo = uploadResult.secure_url;
 				photoPublicId = uploadResult.public_id;
 			} catch (error) {
@@ -117,10 +97,10 @@ export class PostService {
 				photoPublicId,
 				privacy: dto.privacy ?? post.privacy,
 			},
-			select: this.defaultPost,
+			select: this.select(userId),
 		});
 
-		return updated;
+		return this.formatPost(updated);
 	}
 
 	async remove(id: string, userId: string) {
@@ -145,121 +125,83 @@ export class PostService {
 	async getAll(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
-		const [posts, total] = await Promise.all([
+		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
-				where: {
-					privacy: 'PUBLIC',
-				},
+				where: { privacy: 'PUBLIC' },
 				skip,
 				take,
 				orderBy: [{ createdAt: 'desc' }],
-				select: this.defaultPost,
+				select: this.select(userId),
 			}),
 			this.prisma.post.count({
-				where: {
-					privacy: 'PUBLIC',
-				},
+				where: { privacy: 'PUBLIC' },
 			}),
 		]);
 
-		if (userId) {
-			const postsWithLike = await Promise.all(
-				posts.map(async post => {
-					const likedByUser = await this.likeService.hasLikedPost(
-						userId,
-						post.id,
-					);
-					return { ...post, liked: likedByUser };
-				}),
-			);
-
-			return {
-				data: postsWithLike,
-				total,
-				page,
-				take,
-				totalPages: Math.ceil(total / take),
-			};
-		}
-
 		return {
-			data: posts,
+			data: this.formatPosts(data),
 			total,
 			page,
-			lastPage: Math.ceil(total / take),
+			totalPages: Math.ceil(total / take),
 		};
+	}
+
+	async getOne(id: string, userId?: string) {
+		const post = await this.prisma.post.findUnique({
+			where: { id },
+			select: this.select(userId),
+		});
+
+		if (!post) throw new NotFoundException('Post not found');
+
+		const isOwner = post.user.id === userId;
+		const isPublic = post.privacy === 'PUBLIC';
+
+		if (!isPublic && !isOwner)
+			throw new ForbiddenException('You are not allowed to view this post');
+
+		return this.formatPost(post);
 	}
 
 	async getFeed(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
-		const following = await this.prisma.follow.findMany({
-			where: { followerId: userId },
-			select: { followingId: true },
-		});
-		const followingIds = [
-			...new Set([...following.map(f => f.followingId), userId]),
-		];
+		const followingIds = await this.followService.getFollowingIds(userId);
 
-		const [posts, total] = await Promise.all([
+		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
 				where: {
-					userId: { in: followingIds },
+					userId: { in: [...followingIds, userId] },
 					privacy: 'PUBLIC',
 				},
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				select: this.defaultPost,
+				select: this.select(userId),
 			}),
 			this.prisma.post.count({
 				where: {
-					userId: { in: followingIds },
+					userId: { in: [...followingIds, userId] },
 					privacy: 'PUBLIC',
 				},
 			}),
 		]);
 
-		if (userId) {
-			const postsWithLike = await Promise.all(
-				posts.map(async post => {
-					const likedByUser = await this.likeService.hasLikedPost(
-						userId,
-						post.id,
-					);
-					return { ...post, liked: likedByUser };
-				}),
-			);
-
-			return {
-				data: postsWithLike,
-				total,
-				page,
-				take,
-				totalPages: Math.ceil(total / take),
-			};
-		}
-
 		return {
-			data: posts,
+			data: this.formatPosts(data),
 			total,
 			page,
-			lastPage: Math.ceil(total / take),
+			totalPages: Math.ceil(total / take),
 		};
 	}
 
 	async getDiscover(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
-		const following = await this.prisma.follow.findMany({
-			where: { followerId: userId },
-			select: { followingId: true },
-		});
-		const excludedIds = [
-			...new Set([...following.map(f => f.followingId), userId]),
-		];
+		const excludedIds = await this.followService.getFollowingIds(userId);
+		excludedIds.push(userId);
 
-		const [posts, total] = await Promise.all([
+		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
 				where: {
 					userId: { notIn: excludedIds },
@@ -272,7 +214,7 @@ export class PostService {
 					{ comments: { _count: 'desc' } },
 					{ createdAt: 'desc' },
 				],
-				select: this.defaultPost,
+				select: this.select(userId),
 			}),
 			this.prisma.post.count({
 				where: {
@@ -282,103 +224,56 @@ export class PostService {
 			}),
 		]);
 
-		if (userId) {
-			const postsWithLike = await Promise.all(
-				posts.map(async post => {
-					const likedByUser = await this.likeService.hasLikedPost(
-						userId,
-						post.id,
-					);
-					return { ...post, liked: likedByUser };
-				}),
-			);
-
-			return {
-				data: postsWithLike,
-				total,
-				page,
-				take,
-				totalPages: Math.ceil(total / take),
-			};
-		}
-
 		return {
-			data: posts,
+			data: this.formatPosts(data),
 			total,
 			page,
-			lastPage: Math.ceil(total / take),
+			totalPages: Math.ceil(total / take),
 		};
 	}
 
-	async findUserPosts(userId: string, page: number, take: number) {
+	async getUserPosts(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
-		const [posts, total] = await Promise.all([
+		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
-				where: { userId },
+				where: {
+					userId,
+					privacy: 'PUBLIC',
+				},
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
-				select: this.defaultPost,
+				select: this.select(userId),
 			}),
-			this.prisma.post.count({ where: { userId } }),
+			this.prisma.post.count({
+				where: {
+					userId,
+					privacy: 'PUBLIC',
+				},
+			}),
 		]);
 
-		if (userId) {
-			const postsWithLike = await Promise.all(
-				posts.map(async post => {
-					const likedByUser = await this.likeService.hasLikedPost(
-						userId,
-						post.id,
-					);
-					return { ...post, liked: likedByUser };
-				}),
-			);
-
-			return {
-				data: postsWithLike,
-				total,
-				page,
-				take,
-				totalPages: Math.ceil(total / take),
-			};
-		}
-
 		return {
-			data: posts,
+			data: this.formatPosts(data),
 			total,
 			page,
-			lastPage: Math.ceil(total / take),
+			take,
+			totalPages: Math.ceil(total / take),
 		};
 	}
 
-	async findOne(id: string, userId?: string) {
-		const post = await this.prisma.post.findUnique({
-			where: { id },
-			select: {
-				...this.defaultPost,
-				likes: {
-					where: { userId },
-					select: { id: true },
-				},
-			},
-		});
-
-		if (!post) throw new NotFoundException('Post not found');
-
-		const isOwner = post.user.id === userId;
-		const isPublic = post.privacy === 'PUBLIC';
-
-		if (!isPublic && !isOwner)
-			throw new ForbiddenException('You are not allowed to view this post');
-
-		if (userId) {
-			const likedByUser = await this.likeService.hasLikedPost(userId, id);
-			return { ...post, liked: likedByUser };
-		}
-
-		return post;
-	}
+	private select = (userId?: string) => ({
+		...this.defaultPost,
+		likes: {
+			where: { userId },
+			select: { id: true },
+		},
+		savedBy: {
+			where: { userId },
+			select: { id: true },
+		},
+	});
 
 	private readonly defaultPost = {
 		id: true,
@@ -403,4 +298,16 @@ export class PostService {
 			},
 		},
 	} as const;
+
+	private formatPosts(posts: any[]) {
+		return posts.map(post => this.formatPost(post));
+	}
+
+	private formatPost(post: any) {
+		return {
+			...post,
+			liked: post.likes.length > 0,
+			saved: post.savedBy.length > 0,
+		};
+	}
 }
