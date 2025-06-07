@@ -53,12 +53,6 @@ export class PostController {
 	}
 
 	@Authorization()
-	@Get(':id')
-	getPost(@Param('id') id: string, @CurrentUser('id') userId: string) {
-		return this.postService.getOne(id, userId);
-	}
-
-	@Authorization()
 	@Get('feed')
 	getFeed(
 		@CurrentUser('id') userId: string,
@@ -95,6 +89,12 @@ export class PostController {
 		@Query('take') take = '10',
 	) {
 		return this.postService.getUserPosts(userId, +page, +take);
+	}
+
+	@Authorization()
+	@Get(':id')
+	getPost(@Param('id') id: string, @CurrentUser('id') userId: string) {
+		return this.postService.getOne(id, userId);
 	}
 
 	@Authorization()

@@ -19,7 +19,7 @@ export class LikeService {
 	) {}
 
 	async togglePostLike(postId: string, userId: string) {
-		const post = await this.post.findOne(postId);
+		const post = await this.post.getOne(postId);
 		if (!post) throw new Error('Post not found');
 
 		const liked = await this.hasLikedPost(userId, postId);
