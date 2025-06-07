@@ -6,6 +6,7 @@ import { NotificationModule } from '../notification/notification.module';
 import { PostService } from '../post/post.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { FollowService } from '../follow/follow.service';
+import { CommentService } from '../comment/comment.service';
 
 @Module({
 	imports: [NotificationModule],
@@ -16,6 +17,7 @@ import { FollowService } from '../follow/follow.service';
 		PostService,
 		CloudinaryService,
 		FollowService,
+		CommentService,
 	],
 	exports: [LikeService],
 })
