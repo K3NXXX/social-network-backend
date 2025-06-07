@@ -73,8 +73,58 @@ export class FollowService {
 	}
 
 	async getFollowers(userId: string) {
-		return this.prisma.follow.findMany({
-			where: { followingId: userId },
+		return this.prisma.follow
+			.findMany({
+				where: { followingId: userId },
+				select: {
+					follower: {
+						select: {
+							id: true,
+							firstName: true,
+							lastName: true,
+							username: true,
+							avatarUrl: true,
+						},
+					},
+					createdAt: true,
+				},
+			})
+			.then(followers =>
+				followers.map(f => ({
+					...f.follower,
+					createdAt: f.createdAt,
+				})),
+			);
+	}
+
+	async getFollowing(userId: string) {
+		return this.prisma.follow
+			.findMany({
+				where: { followerId: userId },
+				select: {
+					following: {
+						select: {
+							id: true,
+							firstName: true,
+							lastName: true,
+							username: true,
+							avatarUrl: true,
+						},
+					},
+					createdAt: true,
+				},
+			})
+			.then(following =>
+				following.map(f => ({
+					...f.following,
+					createdAt: f.createdAt,
+				})),
+			);
+	}
+
+	async getUserFollowers(targetUserId: string, currentUserId: string) {
+		const followers = await this.prisma.follow.findMany({
+			where: { followingId: targetUserId },
 			select: {
 				follower: {
 					select: {
@@ -88,11 +138,27 @@ export class FollowService {
 				createdAt: true,
 			},
 		});
+
+		const currentUserFollowing = await this.prisma.follow.findMany({
+			where: {
+				followerId: currentUserId,
+				followingId: { in: followers.map(f => f.follower.id) },
+			},
+			select: { followingId: true },
+		});
+
+		const followingSet = new Set(currentUserFollowing.map(f => f.followingId));
+
+		return followers.map(f => ({
+			...f.follower,
+			isFollowed: followingSet.has(f.follower.id),
+			createdAt: f.createdAt,
+		}));
 	}
 
-	async getFollowing(userId: string) {
-		return this.prisma.follow.findMany({
-			where: { followerId: userId },
+	async getUserFollowing(targetUserId: string, currentUserId: string) {
+		const following = await this.prisma.follow.findMany({
+			where: { followerId: targetUserId },
 			select: {
 				following: {
 					select: {
@@ -106,14 +172,22 @@ export class FollowService {
 				createdAt: true,
 			},
 		});
-	}
 
-	async getFollowingIds(userId: string): Promise<string[]> {
-		const follows = await this.prisma.follow.findMany({
-			where: { followerId: userId },
+		const currentUserFollowing = await this.prisma.follow.findMany({
+			where: {
+				followerId: currentUserId,
+				followingId: { in: following.map(f => f.following.id) },
+			},
 			select: { followingId: true },
 		});
-		return follows.map(f => f.followingId);
+
+		const followingSet = new Set(currentUserFollowing.map(f => f.followingId));
+
+		return following.map(f => ({
+			...f.following,
+			isFollowed: followingSet.has(f.following.id),
+			createdAt: f.createdAt,
+		}));
 	}
 
 	async isFollowing(userId: string, followingId: string) {
