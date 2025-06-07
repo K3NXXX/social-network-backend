@@ -100,7 +100,13 @@ export class PostService {
 			select: this.select(userId),
 		});
 
-		return this.formatPost(updated);
+		const { likes, savedBy, ...rest } = updated;
+
+		return {
+			...rest,
+			liked: !!likes,
+			saved: !!savedBy,
+		};
 	}
 
 	async remove(id: string, userId: string) {
@@ -160,7 +166,13 @@ export class PostService {
 		if (!isPublic && !isOwner)
 			throw new ForbiddenException('You are not allowed to view this post');
 
-		return this.formatPost(post);
+		const { likes, savedBy, ...rest } = post;
+
+		return {
+			...rest,
+			liked: !!likes,
+			saved: !!savedBy,
+		};
 	}
 
 	async getFeed(userId: string, page: number, take: number) {
@@ -300,14 +312,10 @@ export class PostService {
 	} as const;
 
 	private formatPosts(posts: any[]) {
-		return posts.map(post => this.formatPost(post));
-	}
-
-	private formatPost(post: any) {
-		return {
-			...post,
-			liked: post.likes.length > 0,
-			saved: post.savedBy.length > 0,
-		};
+		return posts.map(({ likes, savedBy, ...rest }) => ({
+			...rest,
+			liked: !!likes.length,
+			saved: !!savedBy.length,
+		}));
 	}
 }
