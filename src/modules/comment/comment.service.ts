@@ -18,7 +18,7 @@ export class CommentService {
 		private readonly notificationsGateway: NotificationsGateway,
 	) {}
 
-	async create(dto: CommentDto, userId: string) {
+	async create(userId: string, dto: CommentDto) {
 		const { postId, content, parentId } = dto;
 
 		const post = await this.prisma.post.findUnique({ where: { id: postId } });
@@ -82,72 +82,44 @@ export class CommentService {
 		return comment;
 	}
 
-	async findOne(id: string) {
+	async findOne(id: string, userId: string) {
 		const comment = await this.prisma.comment.findUnique({
 			where: { id },
-			include: {
-				user: {
-					select: {
-						username: true,
-						firstName: true,
-						lastName: true,
-						avatarUrl: true,
-					},
-				},
-				_count: {
-					select: {
-						likes: true,
-						replies: true,
-					},
-				},
-			},
+			select: this.select(userId),
 		});
 
 		if (!comment) throw new NotFoundException('Comment not found');
 
-		return comment;
+		const { likes, ...rest } = comment;
+
+		return {
+			...rest,
+			liked: !!likes.length,
+		};
 	}
 
-	async findAllForPost(postId: string, page: number, take: number) {
+	async findAllForPost(
+		postId: string,
+		userId: string,
+		page: number,
+		take: number,
+	) {
 		const post = await this.prisma.post.findUnique({ where: { id: postId } });
 		if (!post) throw new NotFoundException('Post not found');
 
-		const [comments, total] = await this.prisma.$transaction([
+		const [comments, total] = await Promise.all([
 			this.prisma.comment.findMany({
-				where: {
-					postId,
-					parentId: null,
-				},
+				where: { postId },
 				orderBy: { createdAt: 'desc' },
 				skip: (page - 1) * take,
-				take: take,
-				include: {
-					user: {
-						select: {
-							username: true,
-							firstName: true,
-							lastName: true,
-							avatarUrl: true,
-						},
-					},
-					_count: {
-						select: {
-							likes: true,
-							replies: true,
-						},
-					},
-				},
+				take,
+				select: this.select(userId),
 			}),
-			this.prisma.comment.count({
-				where: {
-					postId,
-					parentId: null,
-				},
-			}),
+			this.prisma.comment.count({ where: { postId } }),
 		]);
 
 		return {
-			data: comments,
+			data: this.format(comments),
 			total,
 			page,
 			take,
@@ -155,40 +127,25 @@ export class CommentService {
 		};
 	}
 
-	async findReplies(parentId: string, page: number, take: number) {
+	async findReplies(id: string, userId: string, page: number, take: number) {
 		const parent = await this.prisma.comment.findUnique({
-			where: { id: parentId },
+			where: { id: id },
 		});
 		if (!parent) throw new NotFoundException('Parent comment not found');
 
-		const [replies, total] = await this.prisma.$transaction([
+		const [replies, total] = await Promise.all([
 			this.prisma.comment.findMany({
-				where: { parentId },
+				where: { parentId: id },
 				orderBy: { createdAt: 'asc' },
 				skip: (page - 1) * take,
-				take: take,
-				include: {
-					user: {
-						select: {
-							username: true,
-							firstName: true,
-							lastName: true,
-							avatarUrl: true,
-						},
-					},
-					_count: {
-						select: {
-							likes: true,
-							replies: true,
-						},
-					},
-				},
+				take,
+				select: this.select(userId),
 			}),
-			this.prisma.comment.count({ where: { parentId } }),
+			this.prisma.comment.count({ where: { parentId: id } }),
 		]);
 
 		return {
-			data: replies,
+			data: this.format(replies),
 			total,
 			page,
 			take,
@@ -226,5 +183,43 @@ export class CommentService {
 		await this.prisma.comment.delete({ where: { id: comment.id } });
 
 		return { message: 'Comment deleted successfully' };
+	}
+
+	private select(userId?: string) {
+		return {
+			id: true,
+			content: true,
+			parentId: true,
+			createdAt: true,
+			updatedAt: true,
+			user: {
+				select: {
+					id: true,
+					firstName: true,
+					lastName: true,
+					username: true,
+					avatarUrl: true,
+				},
+			},
+			_count: {
+				select: {
+					likes: true,
+					replies: true,
+				},
+			},
+			...(userId && {
+				likes: {
+					where: { userId },
+					select: { id: true },
+				},
+			}),
+		};
+	}
+
+	private format(comments: any[]) {
+		return comments.map(({ likes, ...rest }) => ({
+			...rest,
+			liked: !!likes?.length,
+		}));
 	}
 }
