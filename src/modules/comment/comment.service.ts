@@ -91,9 +91,10 @@ export class CommentService {
 		if (!comment) throw new NotFoundException('Comment not found');
 
 		const { likes, ...rest } = comment;
+
 		return {
 			...rest,
-			liked: !!likes,
+			liked: !!likes.length,
 		};
 	}
 
