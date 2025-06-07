@@ -1,8 +1,6 @@
 import {
 	BadRequestException,
 	ForbiddenException,
-	forwardRef,
-	Inject,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
@@ -11,7 +9,6 @@ import { PrismaService } from '../../common/prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationsGateway } from '../notification/notifications.gateway';
 import { CommentDto } from './dto/comment.dto';
-import { LikeService } from '../like/like.service';
 
 @Injectable()
 export class CommentService {
@@ -19,8 +16,6 @@ export class CommentService {
 		private readonly prisma: PrismaService,
 		private readonly notification: NotificationService,
 		private readonly notificationsGateway: NotificationsGateway,
-		@Inject(forwardRef(() => LikeService))
-		private readonly likeService: LikeService,
 	) {}
 
 	async create(userId: string, dto: CommentDto) {
@@ -90,17 +85,16 @@ export class CommentService {
 	async findOne(id: string, userId: string) {
 		const comment = await this.prisma.comment.findUnique({
 			where: { id },
-			select: this.defaultComment,
+			select: this.select(userId),
 		});
 
 		if (!comment) throw new NotFoundException('Comment not found');
 
-		if (userId) {
-			const likedByUser = await this.likeService.hasLikedComment(userId, id);
-			return { ...comment, liked: likedByUser };
-		}
-
-		return comment;
+		const { likes, ...rest } = comment;
+		return {
+			...rest,
+			liked: !!likes,
+		};
 	}
 
 	async findAllForPost(
@@ -118,38 +112,17 @@ export class CommentService {
 				orderBy: { createdAt: 'desc' },
 				skip: (page - 1) * take,
 				take,
-				select: this.defaultComment,
+				select: this.select(userId),
 			}),
-			this.prisma.comment.count({
-				where: { postId },
-			}),
+			this.prisma.comment.count({ where: { postId } }),
 		]);
 
-		if (userId) {
-			const commentsWithLike = await Promise.all(
-				comments.map(async reply => {
-					const likedByUser = await this.likeService.hasLikedComment(
-						userId,
-						reply.id,
-					);
-					return { ...reply, liked: likedByUser };
-				}),
-			);
-
-			return {
-				data: commentsWithLike,
-				total,
-				page,
-				take,
-				totalPages: Math.ceil(total / take),
-			};
-		}
-
 		return {
-			data: comments,
+			data: this.format(comments),
 			total,
 			page,
-			lastPage: Math.ceil(total / take),
+			take,
+			totalPages: Math.ceil(total / take),
 		};
 	}
 
@@ -161,37 +134,17 @@ export class CommentService {
 
 		const [replies, total] = await Promise.all([
 			this.prisma.comment.findMany({
-				where: { id },
+				where: { parentId: id },
 				orderBy: { createdAt: 'asc' },
 				skip: (page - 1) * take,
 				take,
-				select: this.defaultComment,
+				select: this.select(userId),
 			}),
-			this.prisma.comment.count({ where: { id } }),
+			this.prisma.comment.count({ where: { parentId: id } }),
 		]);
 
-		if (userId) {
-			const repliesWithLike = await Promise.all(
-				replies.map(async reply => {
-					const likedByUser = await this.likeService.hasLikedComment(
-						userId,
-						reply.id,
-					);
-					return { ...reply, liked: likedByUser };
-				}),
-			);
-
-			return {
-				data: repliesWithLike,
-				total,
-				page,
-				take,
-				totalPages: Math.ceil(total / take),
-			};
-		}
-
 		return {
-			data: replies,
+			data: this.format(replies),
 			total,
 			page,
 			take,
@@ -231,26 +184,41 @@ export class CommentService {
 		return { message: 'Comment deleted successfully' };
 	}
 
-	private readonly defaultComment = {
-		id: true,
-		content: true,
-		parentId: true,
-		createdAt: true,
-		updatedAt: true,
-		user: {
-			select: {
-				id: true,
-				firstName: true,
-				lastName: true,
-				username: true,
-				avatarUrl: true,
+	private select(userId?: string) {
+		return {
+			id: true,
+			content: true,
+			parentId: true,
+			createdAt: true,
+			updatedAt: true,
+			user: {
+				select: {
+					id: true,
+					firstName: true,
+					lastName: true,
+					username: true,
+					avatarUrl: true,
+				},
 			},
-		},
-		_count: {
-			select: {
-				likes: true,
-				replies: true,
+			_count: {
+				select: {
+					likes: true,
+					replies: true,
+				},
 			},
-		},
-	} as const;
+			...(userId && {
+				likes: {
+					where: { userId },
+					select: { id: true },
+				},
+			}),
+		};
+	}
+
+	private format(comments: any[]) {
+		return comments.map(({ likes, ...rest }) => ({
+			...rest,
+			liked: !!likes?.length,
+		}));
+	}
 }
