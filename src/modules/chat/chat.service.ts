@@ -1,8 +1,4 @@
-import {
-	BadRequestException,
-	Injectable,
-	NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { UserService } from '../user/user.service';
 import { ChatDto } from './dto/chat.dto';
@@ -27,7 +23,9 @@ export class ChatService {
 			},
 			include: {
 				participants: {
-					select: { user: { select: this.USER } },
+					select: {
+						user: { select: this.USER },
+					},
 				},
 			},
 		});
@@ -35,7 +33,7 @@ export class ChatService {
 		return chat;
 	}
 
-	async findChat(senderId: string, receiverId: string) {
+	async getChat(senderId: string, receiverId: string) {
 		if (senderId === receiverId)
 			throw new BadRequestException("Can't chat with yourself");
 
@@ -57,29 +55,39 @@ export class ChatService {
 		return chat;
 	}
 
-	async findOrCreateChat(senderId: string, receiverId: string) {
-		const chat = await this.findChat(senderId, receiverId);
+	async getChatById(chatId: string) {
+		return this.prisma.chat.findUnique({
+			where: { id: chatId },
+			include: {
+				participants: {
+					include: { user: true },
+				},
+				messages: {
+					orderBy: { createdAt: 'desc' },
+					take: 1,
+				},
+			},
+		});
+	}
+
+	async getOrCreateChat(senderId: string, receiverId: string) {
+		const chat = await this.getChat(senderId, receiverId);
 
 		if (chat) return { chat, isNew: false };
 
-		const receiver = await this.prisma.user.findUnique({
-			where: { id: receiverId },
-			select: this.USER,
-		});
-
-		if (!receiver) throw new NotFoundException('Receiver not found');
-
 		const newChat = await this.create(senderId, receiverId);
-		return { chat: newChat, isNew: true, receiver };
+		return { chat: newChat, isNew: true };
 	}
 
-	async findUserChats(
+	async getUserChats(
 		userId: string,
 		take = 20,
 		cursor?: string,
 	): Promise<ChatDto[]> {
 		const chats = await this.prisma.chat.findMany({
-			where: { participants: { some: { userId } } },
+			where: {
+				participants: { some: { userId } },
+			},
 			take,
 			skip: cursor ? 1 : undefined,
 			...(cursor && { cursor: { id: cursor } }),

@@ -6,18 +6,18 @@ import { CurrentUser } from '../../common/decorators/user.decorator';
 @Authorization()
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+	constructor(private readonly chatService: ChatService) {}
 
-  @Get('i')
-  async findUserChats(@CurrentUser('id') userId: string) {
-    return this.chatService.findUserChats(userId);
-  }
+	@Get('i')
+	async findUserChats(@CurrentUser('id') userId: string) {
+		return this.chatService.getUserChats(userId);
+	}
 
-  @Get(':receiverId')
-  async findChat(
-    @CurrentUser('id') userId: string,
-    @Param('receiverId') receiverId: string,
-  ) {
-    return this.chatService.findChat(userId, receiverId);
-  }
+	@Get(':receiverId')
+	async findChat(
+		@CurrentUser('id') userId: string,
+		@Param('receiverId') receiverId: string,
+	) {
+		return this.chatService.getChat(userId, receiverId);
+	}
 }

@@ -15,16 +15,28 @@ export class MessageService {
 		private readonly chatService: ChatService,
 	) {}
 
-	async sendMessage(senderId: string, dto: MessageDto) {
+	async sendMessage(senderId: string, dto: MessageDto, chatId?: string) {
 		const { content, imageUrl, receiverId } = dto;
 
-		if (!content?.trim() && !imageUrl)
+		if (!content?.trim() && !imageUrl) {
 			throw new BadRequestException('Message must contain content or image');
+		}
 
-		const { chat, isNew, receiver } = await this.chatService.findOrCreateChat(
-			senderId,
-			receiverId,
-		);
+		let chat;
+		let isNew = false;
+
+		if (chatId) {
+			chat = await this.chatService.getChatById(chatId);
+			if (!chat)
+				throw new NotFoundException(`Chat with ID ${chatId} not found`);
+		} else {
+			const chatResult = await this.chatService.getOrCreateChat(
+				senderId,
+				receiverId,
+			);
+			chat = chatResult.chat;
+			isNew = chatResult.isNew;
+		}
 
 		const message = await this.prisma.message.create({
 			data: {
@@ -47,7 +59,7 @@ export class MessageService {
 			},
 		});
 
-		return { ...message, chatId: chat.id, isNew, receiver };
+		return { ...message, isNew, chat };
 	}
 
 	async getMessages(
@@ -56,7 +68,7 @@ export class MessageService {
 		take = 30,
 		cursor?: string,
 	) {
-		const chat = await this.chatService.findChat(userId, receiverId);
+		const chat = await this.chatService.getChat(userId, receiverId);
 		if (!chat) return [];
 
 		const where: any = {

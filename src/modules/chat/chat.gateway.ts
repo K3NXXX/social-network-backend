@@ -14,28 +14,20 @@ import { InternalServerErrorException, Logger } from '@nestjs/common';
 import { MessageService } from './message/message.service';
 import { MessageDto } from './message/dto/message.dto';
 import { UserService } from '../user/user.service';
-
-export enum ChatEvents {
-	JoinChat = 'join_chat',
-	LeaveChat = 'leave_chat',
-	NewMessage = 'newMessage',
-	Message = 'message',
-	Error = 'error',
-	ChatCreated = 'chat_created',
-	MessageSeen = 'message_seen',
-	UserOnline = 'user_online',
-	UserOffline = 'user_offline',
-}
+import { ChatService } from './chat.service';
+import { ChatEvents } from './chat.events';
 
 @WebSocketGateway({ cors: true })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
-	private userSockets = new Map<string, Set<string>>();
-	private logger = new Logger(ChatGateway.name);
-
 	@WebSocketServer() server: Server;
+
+	private userSockets = new Map<string, Set<string>>();
+
+	private logger = new Logger(ChatGateway.name);
 
 	constructor(
 		private readonly messageService: MessageService,
+		private readonly chatService: ChatService,
 		private readonly userService: UserService,
 		private readonly jwt: JwtService,
 		private readonly configService: ConfigService,
@@ -121,31 +113,40 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	) {
 		try {
 			const senderId = client.data.user?.id;
-			if (!senderId) throw new Error('User ID not found in socket');
+			if (!senderId)
+				throw new InternalServerErrorException('User ID not found in socket');
 
 			const message = await this.messageService.sendMessage(senderId, dto);
-			const chatId = message.chatId;
+
+			const chatId = message.chat?.id;
+			if (!chatId)
+				throw new InternalServerErrorException('Chat ID missing in message');
 
 			client.join(chatId);
 
 			if (message.isNew) {
-				client.emit(ChatEvents.ChatCreated, { chatId, user: message.receiver });
+				const chat = await this.chatService.getChatById(chatId);
+
+				client.emit(ChatEvents.ChatCreated, chat);
 
 				const receiverId = dto.receiverId;
+				if (!receiverId)
+					throw new InternalServerErrorException('Receiver ID is missing');
+
 				const receiverSocketIds = this.userSockets.get(receiverId) ?? new Set();
 				for (const id of receiverSocketIds) {
 					const sock = this.server.sockets.sockets.get(id);
 					if (sock) {
 						sock.join(chatId);
-						sock.emit(ChatEvents.ChatCreated, {
-							chatId,
-							user: message.receiver,
-						});
+						sock.emit(ChatEvents.ChatCreated, chat);
 					}
 				}
 			}
 
-			this.server.to(chatId).emit(ChatEvents.Message, { ...message, chatId });
+			this.server.to(chatId).emit(ChatEvents.Message, {
+				...message,
+				chatId,
+			});
 		} catch (err) {
 			this.logger.error(`Send message error: ${err.message}`);
 			client.emit(ChatEvents.Error, { message: err.message });
