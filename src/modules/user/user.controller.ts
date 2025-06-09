@@ -5,6 +5,7 @@ import {
 	Get,
 	Param,
 	Patch,
+	Post,
 	Query,
 	UploadedFile,
 	UseInterceptors,
@@ -12,25 +13,23 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Authorization } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
-import { UpdateUserDto } from './dto/user.dto';
+import { UserDto } from './dto/user.dto';
 import { UserService } from './user.service';
 import { FollowService } from '../follow/follow.service';
+import { AccountDto } from './dto/account.dto';
+import { EmailService } from '../auth/email/email.service';
 
 @Controller('user')
 export class UserController {
 	constructor(
 		private readonly userService: UserService,
 		private readonly followService: FollowService,
+		private readonly emailService: EmailService,
 	) {}
 
 	@Get()
 	async search(@Query('search') query: string) {
 		return this.userService.search(query);
-	}
-
-	@Get('all')
-	async getAll() {
-		return this.userService.getAll();
 	}
 
 	@Authorization()
@@ -63,22 +62,34 @@ export class UserController {
 	}
 
 	@Authorization()
-	@Patch('update')
-	async updateUser(
-		@Body() updateUserDto: UpdateUserDto,
+	@Patch('profile')
+	async updateProfile(@CurrentUser('id') userId: string, @Body() dto: UserDto) {
+		return this.userService.updateProfile(userId, dto);
+	}
+
+	@Authorization()
+	@Patch('account')
+	async updateAccount(
 		@CurrentUser('id') userId: string,
+		@Body() dto: AccountDto,
 	) {
-		return this.userService.update(updateUserDto, userId);
+		return this.userService.updateAccount(userId, dto);
+	}
+
+	@Authorization()
+	@Post('account/email')
+	async updateEmail(@Body('code') code: string) {
+		return this.emailService.confirmEmailChange(+code);
 	}
 
 	@Authorization()
 	@Patch('update/avatar')
 	@UseInterceptors(FileInterceptor('file'))
 	async uploadAvatar(
-		@UploadedFile() file: Express.Multer.File,
 		@CurrentUser('id') userId: string,
+		@UploadedFile() file: Express.Multer.File,
 	) {
-		return this.userService.uploadAvatar(file, userId);
+		return this.userService.uploadAvatar(userId, file);
 	}
 
 	@Authorization()

@@ -40,6 +40,7 @@ enum TokenType {
   VERIFICATION
   TWO_FACTOR
   PASSWORD_RESET
+  EMAIL_CHANGE
 }
 
 // Rest of the schema remains unchanged since it was already in English
@@ -152,7 +153,7 @@ model Comment {
   user   User   @relation(fields: [userId], references: [id])
 
   postId String
-  post   Post   @relation(fields: [postId], references: [id])
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   parentId String?
   parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
@@ -207,6 +208,8 @@ model SavedPost {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
   @@map("saved_posts")
 }
 

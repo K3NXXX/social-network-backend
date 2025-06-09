@@ -8,18 +8,22 @@ import { ConfigService } from '@nestjs/config';
 import { UserService } from '../user/user.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MessageService } from './message/message.service';
+import { EmailService } from '../auth/email/email.service';
+import { MailService } from '../../common/mail/mail.service';
 
 @Module({
-  controllers: [ChatController],
-  providers: [
-    ChatGateway,
-    ChatService,
-    PrismaService,
-    JwtService,
-    ConfigService,
-    UserService,
-    CloudinaryService,
-    MessageService,
-  ],
+	controllers: [ChatController],
+	providers: [
+		ChatGateway,
+		ChatService,
+		PrismaService,
+		JwtService,
+		ConfigService,
+		UserService,
+		CloudinaryService,
+		MessageService,
+		EmailService,
+		MailService,
+	],
 })
 export class ChatModule {}

@@ -8,23 +8,30 @@ import { PrismaService } from '../../common/prisma.service';
 import { UserService } from '../user/user.service';
 import { getJwtConfig } from 'src/common/config/jwt.config';
 import { JwtStrategy } from '../../common/strategies/jwt.strategy';
-import { CloudinaryService } from '../cloudinary/cloudinary.service'
-import { EmailConfirmationModule } from './email-confirmation/email-confirmation.module';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { EmailModule } from './email/email.module';
 import { MailService } from 'src/common/mail/mail.service';
 
 @Module({
-  imports: [
-    UserModule,
-    ConfigModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: getJwtConfig,
-    }),
-    forwardRef(() => EmailConfirmationModule)
-  ],
-  controllers: [AuthController],
-  providers: [AuthService, PrismaService, JwtStrategy, UserService, CloudinaryService, MailService],
-  exports: [AuthService]
+	imports: [
+		ConfigModule,
+		JwtModule.registerAsync({
+			imports: [ConfigModule],
+			inject: [ConfigService],
+			useFactory: getJwtConfig,
+		}),
+		forwardRef(() => EmailModule),
+		forwardRef(() => UserModule),
+	],
+	controllers: [AuthController],
+	providers: [
+		AuthService,
+		PrismaService,
+		JwtStrategy,
+		UserService,
+		CloudinaryService,
+		MailService,
+	],
+	exports: [AuthService],
 })
 export class AuthModule {}

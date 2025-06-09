@@ -78,15 +78,24 @@ export class PostController {
 		return this.postService.findUserPosts(userId, +page, +take);
 	}
 
+	@Get('user/:userId')
+	findOtherUserPosts(
+		@Param('userId') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '10',
+	) {
+		return this.postService.findUserPosts(userId, +page, +take);
+	}
+
 	@Authorization()
 	@Get(':id')
-	async getPost(@Param('id') id: string, @CurrentUser('id') userId: string) {
+	async getPost(@CurrentUser('id') userId: string, @Param('id') id: string) {
 		return this.postService.findOne(id, userId);
 	}
 
 	@Authorization()
 	@Delete(':id')
-	remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
+	remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
 		return this.postService.remove(id, userId);
 	}
 }
