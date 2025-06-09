@@ -10,6 +10,18 @@ export class ChatService {
 		private readonly userService: UserService,
 	) {}
 
+	async getAllUsers() {
+		return this.prisma.user.findMany({
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				username: true,
+				avatarUrl: true,
+			},
+		});
+	}
+
 	async create(senderId: string, receiverId: string) {
 		const chat = await this.prisma.chat.create({
 			data: {
