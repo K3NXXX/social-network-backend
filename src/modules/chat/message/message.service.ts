@@ -47,13 +47,7 @@ export class MessageService {
 			},
 			include: {
 				sender: {
-					select: {
-						id: true,
-						firstName: true,
-						lastName: true,
-						username: true,
-						avatarUrl: true,
-					},
+					select: this.USER,
 				},
 				chat: { select: { id: true } },
 			},
@@ -69,32 +63,40 @@ export class MessageService {
 		cursor?: string,
 	) {
 		const chat = await this.chatService.getChat(userId, receiverId);
-		if (!chat) return [];
 
-		const where: any = {
-			chatId: chat.id,
-		};
+		if (!chat)
+			return {
+				messages: [],
+				chat: null,
+				hasNextPage: false,
+				nextCursor: null,
+			};
+
+		const where: any = { chatId: chat.id };
 
 		if (cursor) where.id = { lt: cursor };
 
 		const messages = await this.prisma.message.findMany({
 			where,
 			orderBy: { createdAt: 'desc' },
-			take,
+			take: take + 1,
 			include: {
 				sender: {
-					select: {
-						id: true,
-						firstName: true,
-						lastName: true,
-						username: true,
-						avatarUrl: true,
-					},
+					select: this.USER,
 				},
 			},
 		});
 
-		return messages.reverse();
+		const hasNextPage = messages.length > take;
+
+		if (hasNextPage) messages.pop();
+
+		return {
+			chat,
+			messages: messages.reverse(),
+			hasNextPage,
+			nextCursor: messages.length ? messages[0].id : null,
+		};
 	}
 
 	async markMessageAsSeen(messageId: string, userId: string) {
@@ -104,9 +106,7 @@ export class MessageService {
 				chat: {
 					select: {
 						id: true,
-						participants: {
-							select: { userId: true },
-						},
+						participants: { select: { userId: true } },
 					},
 				},
 			},
@@ -128,4 +128,12 @@ export class MessageService {
 
 		return { chatId: message.chat.id };
 	}
+
+	private readonly USER = {
+		id: true,
+		firstName: true,
+		lastName: true,
+		username: true,
+		avatarUrl: true,
+	};
 }
