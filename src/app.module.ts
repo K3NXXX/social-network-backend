@@ -17,6 +17,7 @@ import { EmailModule } from './modules/auth/email/email.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { MessageModule } from './modules/chat/message/message.module';
 import { SavedPostsModule } from './modules/saved-posts/saved-posts.module';
+import { ResetPasswordModule } from './modules/auth/reset-password/reset-password.module';
 
 @Module({
 	imports: [
@@ -37,6 +38,7 @@ import { SavedPostsModule } from './modules/saved-posts/saved-posts.module';
 		MailModule,
 		EmailModule,
 		SavedPostsModule,
+		ResetPasswordModule,
 	],
 	controllers: [AppController],
 	providers: [AppService, PrismaService],

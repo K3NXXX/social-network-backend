@@ -4,6 +4,7 @@ import { render } from '@react-email/components';
 import { ConfirmationTemplate } from './templates/confirmation.template';
 import { ConfigService } from '@nestjs/config';
 import { EmailChangeTemplate } from './templates/email-change.template';
+import { ResetPasswordTemplate } from './templates/reset-password.template';
 
 @Injectable()
 export class MailService {
@@ -30,6 +31,12 @@ export class MailService {
 
 		return this.sendMail(email, 'Change Email', html);
 	}
+
+	public async sendResetPassword(email: string, code: number) {
+		const html = await render(ResetPasswordTemplate(code));
+	
+		return this.sendMail(email, "Reset Password", html);
+	  }
 
 	private sendMail(email: string, subject: string, html: string) {
 		return this.transporter.sendMail({
