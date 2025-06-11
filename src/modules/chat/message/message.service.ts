@@ -1,8 +1,8 @@
 import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
+	BadRequestException,
+	ForbiddenException,
+	Injectable,
+	NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma.service';
 import { MessageDto } from './dto/message.dto';
@@ -10,114 +10,129 @@ import { ChatService } from '../chat.service';
 
 @Injectable()
 export class MessageService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly chatService: ChatService,
-  ) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly chatService: ChatService,
+	) {}
 
-  async sendMessage(senderId: string, dto: MessageDto) {
-    const { content, imageUrl, receiverId } = dto;
+	async sendMessage(senderId: string, dto: MessageDto, chatId?: string) {
+		const { content, imageUrl, receiverId } = dto;
 
-    if (!content?.trim() && !imageUrl)
-      throw new BadRequestException('Message must contain content or image');
+		if (!content?.trim() && !imageUrl)
+			throw new BadRequestException('Message must contain content or image');
 
-    const { chat, isNew } = await this.chatService.findOrCreateChat(
-      senderId,
-      receiverId,
-    );
+		let chat;
+		let isNew = false;
 
-    const message = await this.prisma.message.create({
-      data: {
-        content: content?.trim() || '',
-        imageUrl,
-        senderId,
-        chatId: chat.id,
-      },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        chat: {
-          select: {
-            id: true,
-          },
-        },
-      },
-    });
+		if (chatId) {
+			chat = await this.chatService.getChatById(chatId);
+			if (!chat)
+				throw new NotFoundException(`Chat with ID ${chatId} not found`);
+		} else {
+			const chatResult = await this.chatService.getOrCreateChat(
+				senderId,
+				receiverId,
+			);
+			chat = chatResult.chat;
+			isNew = chatResult.isNew;
+		}
 
-    return { ...message, chatId: chat.id, isNew: isNew };
-  }
+		const message = await this.prisma.message.create({
+			data: {
+				content: content?.trim() || '',
+				imageUrl,
+				senderId,
+				chatId: chat.id,
+			},
+			include: {
+				sender: {
+					select: this.USER,
+				},
+				chat: { select: { id: true } },
+			},
+		});
 
-  async getMessages(
-    userId: string,
-    receiverId: string,
-    take = 30,
-    cursor?: string,
-  ) {
-    const chat = await this.chatService.findChat(userId, receiverId);
-    if (!chat) return [];
+		return { ...message, isNew, chat };
+	}
 
-    const where: any = {
-      chatId: chat.id,
-    };
+	async getMessages(
+		userId: string,
+		receiverId: string,
+		take = 30,
+		cursor?: string,
+	) {
+		const chat = await this.chatService.getChat(userId, receiverId);
 
-    if (cursor) where.id = { lt: cursor };
+		if (!chat)
+			return {
+				messages: [],
+				chat: null,
+				hasNextPage: false,
+				nextCursor: null,
+			};
 
-    const messages = await this.prisma.message.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take,
-      include: {
-        sender: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-      },
-    });
+		const where: any = { chatId: chat.id };
 
-    return messages.reverse();
-  }
+		if (cursor) where.id = { lt: cursor };
 
-  async markMessageAsSeen(messageId: string, userId: string) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
-      include: {
-        chat: {
-          select: {
-            id: true,
-            participants: {
-              select: { userId: true },
-            },
-          },
-        },
-      },
-    });
+		const messages = await this.prisma.message.findMany({
+			where,
+			orderBy: { createdAt: 'desc' },
+			take: take + 1,
+			include: {
+				sender: {
+					select: this.USER,
+				},
+			},
+		});
 
-    if (!message) throw new NotFoundException('Message not found');
+		const hasNextPage = messages.length > take;
 
-    const isParticipant = message.chat.participants.some(
-      (p) => p.userId === userId,
-    );
+		if (hasNextPage) messages.pop();
 
-    if (!isParticipant)
-      throw new ForbiddenException('You are not a participant of this chat');
+		return {
+			chat,
+			messages: messages.reverse(),
+			hasNextPage,
+			nextCursor: messages.length ? messages[0].id : null,
+		};
+	}
 
-    await this.prisma.message.update({
-      where: { id: messageId },
-      data: { isRead: true },
-    });
+	async markMessageAsSeen(messageId: string, userId: string) {
+		const message = await this.prisma.message.findUnique({
+			where: { id: messageId },
+			include: {
+				chat: {
+					select: {
+						id: true,
+						participants: { select: { userId: true } },
+					},
+				},
+			},
+		});
 
-    return { chatId: message.chat.id };
-  }
+		if (!message) throw new NotFoundException('Message not found');
+
+		const isParticipant = message.chat.participants.some(
+			p => p.userId === userId,
+		);
+
+		if (!isParticipant)
+			throw new ForbiddenException('You are not a participant of this chat');
+
+		await this.prisma.message.update({
+			where: { id: messageId },
+			data: { isRead: true },
+		});
+
+		return { chatId: message.chat.id };
+	}
+
+	private readonly USER = {
+		id: true,
+		firstName: true,
+		lastName: true,
+		username: true,
+		avatarUrl: true,
+	};
 }
