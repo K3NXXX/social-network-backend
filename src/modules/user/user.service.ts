@@ -5,7 +5,6 @@ import {
 	Injectable,
 	Logger,
 	NotFoundException,
-	UnauthorizedException,
 } from '@nestjs/common';
 import { compare, genSalt, hash } from 'bcrypt';
 import { PrismaService } from '../../common/prisma.service';
@@ -106,9 +105,8 @@ export class UserService {
 		const existingUser = await this.prisma.user.findUnique({
 			where: { email },
 		});
-		if (existingUser) {
+		if (existingUser)
 			throw new ConflictException(`User with email ${email} already exists`);
-		}
 
 		const salt = await genSalt(10);
 		const hashedPassword = await hash(password, salt);
@@ -152,11 +150,11 @@ export class UserService {
 
 			const isValid = await compare(dto.currentPassword, user.password);
 			if (!isValid)
-				throw new UnauthorizedException('Current password is incorrect');
+				throw new ConflictException('Current password is incorrect');
 
 			const isSame = await compare(dto.newPassword, user.password);
 			if (isSame)
-				throw new BadRequestException(
+				throw new ConflictException(
 					'New password cannot be the same as the current one',
 				);
 
