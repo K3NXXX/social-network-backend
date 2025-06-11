@@ -169,7 +169,7 @@ export class UserService {
 				await this.emailService.sendEmailChangeCode(userId, dto.newEmail);
 			} catch (error) {
 				this.logger.error('Failed to send email change code', error);
-				throw new BadRequestException('Failed to send email change code');
+				throw error;
 			}
 
 			return {
