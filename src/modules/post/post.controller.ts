@@ -24,23 +24,32 @@ export class PostController {
 	@UseInterceptors(FileInterceptor('file'))
 	@Post()
 	create(
+		@Body() dto: CreatePostDto,
 		@CurrentUser('id') userId: string,
-		@Body() createPostDto: CreatePostDto,
 		@UploadedFile() file: Express.Multer.File,
 	) {
-		return this.postService.create(createPostDto, userId, file);
+		return this.postService.create(dto, userId, file);
 	}
 
 	@Authorization()
 	@UseInterceptors(FileInterceptor('file'))
 	@Patch(':id')
-	async update(
-		@CurrentUser('id') userId: string,
+	update(
 		@Param('id') id: string,
+		@CurrentUser('id') userId: string,
 		@UploadedFile() file: Express.Multer.File,
 		@Body() dto: UpdatePostDto,
 	) {
-		return this.postService.update(id, userId, dto, file, dto.removePhoto);
+		return this.postService.update(id, userId, dto, file);
+	}
+
+	@Get()
+	getAll(
+		@CurrentUser('id') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '15',
+	) {
+		return this.postService.getAll(userId, +page, +take);
 	}
 
 	@Authorization()
@@ -55,7 +64,7 @@ export class PostController {
 
 	@Authorization()
 	@Get('discover')
-	async discover(
+	discover(
 		@CurrentUser('id') userId: string,
 		@Query('page') page = '1',
 		@Query('take') take = '10',
@@ -63,34 +72,29 @@ export class PostController {
 		return this.postService.getDiscover(userId, +page, +take);
 	}
 
-	@Get()
-	findAll(@Query('page') page = '1', @Query('take') take = '15') {
-		return this.postService.getAll(+page, +take);
-	}
-
 	@Authorization()
 	@Get('user')
-	findUserPosts(
+	getUserPosts(
 		@CurrentUser('id') userId: string,
 		@Query('page') page = '1',
 		@Query('take') take = '10',
 	) {
-		return this.postService.findUserPosts(userId, +page, +take);
+		return this.postService.getUserPosts(userId, +page, +take);
 	}
 
 	@Get('user/:userId')
-	findOtherUserPosts(
+	getOtherUserPosts(
 		@Param('userId') userId: string,
 		@Query('page') page = '1',
 		@Query('take') take = '10',
 	) {
-		return this.postService.findUserPosts(userId, +page, +take);
+		return this.postService.getUserPosts(userId, +page, +take);
 	}
 
 	@Authorization()
 	@Get(':id')
-	async getPost(@CurrentUser('id') userId: string, @Param('id') id: string) {
-		return this.postService.findOne(id, userId);
+	getPost(@Param('id') id: string, @CurrentUser('id') userId: string) {
+		return this.postService.getOne(id, userId);
 	}
 
 	@Authorization()

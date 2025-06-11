@@ -5,33 +5,41 @@ import { CurrentUser } from '../../common/decorators/user.decorator';
 
 @Controller()
 export class FollowController {
-  constructor(private readonly followService: FollowService) {}
+	constructor(private readonly followService: FollowService) {}
 
-  @Authorization()
-  @Post('follow/:followingId')
-  toggleFollow(
-    @CurrentUser('id') followerId: string,
-    @Param('followingId') followingId: string,
-  ) {
-    return this.followService.toggleFollow(followerId, followingId);
-  }
+	@Authorization()
+	@Post('follow/:followingId')
+	toggleFollow(
+		@CurrentUser('id') followerId: string,
+		@Param('followingId') followingId: string,
+	) {
+		return this.followService.toggleFollow(followerId, followingId);
+	}
 
-  @Get('followers/:userId')
-  getFollowers(@Param('userId') userId: string) {
-    return this.followService.getFollowers(userId);
-  }
+	@Authorization()
+	@Get('followers/:userId')
+	getUserFollowers(
+		@CurrentUser('id') currentUserId: string,
+		@Param('userId') userId: string,
+	) {
+		return this.followService.getUserFollowers(userId, currentUserId);
+	}
 
-  @Get('following/:userId')
-  getFollowing(@Param('userId') userId: string) {
-    return this.followService.getFollowing(userId);
-  }
+	@Authorization()
+	@Get('following/:userId')
+	getUserFollowing(
+		@CurrentUser('id') currentUserId: string,
+		@Param('userId') userId: string,
+	) {
+		return this.followService.getUserFollowing(userId, currentUserId);
+	}
 
-  @Authorization()
-  @Get('is-following/:followingId')
-  isFollowing(
-    @CurrentUser('id') userId: string,
-    @Param('followingId') followingId: string,
-  ) {
-    return this.followService.isFollowing(userId, followingId);
-  }
+	@Authorization()
+	@Get('is-following/:followingId')
+	isFollowing(
+		@CurrentUser('id') userId: string,
+		@Param('followingId') followingId: string,
+	) {
+		return this.followService.isFollowing(userId, followingId);
+	}
 }
