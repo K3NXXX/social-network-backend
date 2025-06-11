@@ -66,10 +66,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			}
 
 			this.logger.log(`User connected: ${userId}`);
-		} catch (err) {
-			this.logger.warn(`Socket auth failed: ${err.message}`);
+		} catch (error) {
+			this.logger.warn(`Socket auth failed: ${error}`);
 			client.emit(ChatEvents.Error, { message: 'Unauthorized' });
 			client.disconnect();
+			throw error;
 		}
 	}
 
@@ -147,9 +148,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 				...message,
 				chatId,
 			});
-		} catch (err) {
-			this.logger.error(`Send message error: ${err.message}`);
-			client.emit(ChatEvents.Error, { message: err.message });
+		} catch (error) {
+			this.logger.error(`Send message error: ${error.message}`);
+			client.emit(ChatEvents.Error, { message: error.message });
 		}
 	}
 
@@ -185,9 +186,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 				messageId: data.messageId,
 				userId,
 			});
-		} catch (err) {
-			this.logger.error(`Error marking message as seen: ${err.message}`);
-			client.emit(ChatEvents.Error, { message: err.message });
+		} catch (error) {
+			this.logger.error(`Error marking message as seen: ${error.message}`);
+			client.emit(ChatEvents.Error, { message: error.message });
+			throw error;
 		}
 	}
 }

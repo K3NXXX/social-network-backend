@@ -18,9 +18,8 @@ export class MessageService {
 	async sendMessage(senderId: string, dto: MessageDto, chatId?: string) {
 		const { content, imageUrl, receiverId } = dto;
 
-		if (!content?.trim() && !imageUrl) {
+		if (!content?.trim() && !imageUrl)
 			throw new BadRequestException('Message must contain content or image');
-		}
 
 		let chat;
 		let isNew = false;
