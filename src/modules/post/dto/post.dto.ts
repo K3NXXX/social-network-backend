@@ -1,15 +1,15 @@
-import { IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
+import { Privacy } from '@prisma/client';
 
 export class CreatePostDto {
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(5, { message: 'Content must be at least 5 characters' })
-  content: string;
+	@IsOptional()
+	@IsString()
+	content?: string;
 
-  @IsOptional()
-  @IsString()
-  photo?: string;
+	@IsOptional()
+	@IsEnum(Privacy)
+	privacy?: Privacy;
 }
 
 export class UpdatePostDto extends PartialType(CreatePostDto) {}

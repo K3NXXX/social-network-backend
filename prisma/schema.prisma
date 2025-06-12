@@ -1,10 +1,11 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE")
 }
 
 enum Gender {
@@ -34,6 +35,14 @@ enum NotificationType {
   NEW_FOLLOWER
 }
 
+// Token type for email verification, two-factor authentication, and password reset
+enum TokenType {
+  VERIFICATION
+  TWO_FACTOR
+  PASSWORD_RESET
+  EMAIL_CHANGE
+}
+
 // Rest of the schema remains unchanged since it was already in English
 model User {
   id        String  @id @default(uuid())
@@ -50,17 +59,16 @@ model User {
   bio            String?
   location       String?
 
-  isOnline      Boolean   @default(false)
-  lastLogin     DateTime?
-  amountOfPosts Int       @default(0)
+  isOnline  Boolean   @default(false) @map("is_online")
+  lastLogin DateTime? @map("last_login")
 
   isActive   Status  @default(ACTIVE)
   isVerified Boolean @default(false) @map("is_verified")
 
-  posts      Post[]
-  comments   Comment[]
-  likes      Like[]
-  savedPosts SavedPost[]
+  posts    Post[]
+  comments Comment[]
+  likes    Like[]
+  saved    SavedPost[]
 
   followers Follow[] @relation("Followers")
   following Follow[] @relation("Following")
@@ -81,6 +89,21 @@ model User {
   @@map("users")
 }
 
+model Token {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  code      Int
+  type      TokenType
+  expiresIn DateTime  @map("expires_in")
+  meta      Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, type])
+  @@index([code, type])
+  @@map("tokens")
+}
+
 model BlockedUser {
   id String @id @default(uuid())
 
@@ -97,9 +120,9 @@ model BlockedUser {
 }
 
 model Post {
-  id            String   @id @default(uuid())
-  content       String
-  privacy       Privacy? @default(PUBLIC)
+  id            String  @id @default(uuid())
+  content       String?
+  privacy       Privacy @default(PUBLIC)
   photo         String?
   photoPublicId String?
 
@@ -114,6 +137,11 @@ model Post {
   savedBy       SavedPost[]
   notifications Notification[]
 
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, privacy])
+  @@index([privacy])
+  @@index([photoPublicId])
   @@map("posts")
 }
 
@@ -125,7 +153,7 @@ model Comment {
   user   User   @relation(fields: [userId], references: [id])
 
   postId String
-  post   Post   @relation(fields: [postId], references: [id])
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   parentId String?
   parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
@@ -137,6 +165,10 @@ model Comment {
   likes         Like[]
   notifications Notification[]
 
+  @@index([postId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([parentId])
   @@map("comments")
 }
 
@@ -156,6 +188,8 @@ model Like {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  notifications Notification[]
+
   @@unique([userId, postId])
   @@unique([userId, commentId])
   @@map("likes")
@@ -174,6 +208,8 @@ model SavedPost {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
   @@map("saved_posts")
 }
 
@@ -197,7 +233,7 @@ model Notification {
   id      String           @id @default(uuid())
   type    NotificationType
   message String
-  isRead  Boolean          @default(false)
+  isRead  Boolean          @default(false) @map("is_read")
 
   userId String
   user   User   @relation("UserNotifications", fields: [userId], references: [id])
@@ -207,6 +243,9 @@ model Notification {
 
   postId String?
   post   Post?   @relation(fields: [postId], references: [id])
+
+  likeId String?
+  like   Like?   @relation(fields: [likeId], references: [id])
 
   commentId String?
   comment   Comment? @relation(fields: [commentId], references: [id])
@@ -231,6 +270,7 @@ model Chat {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([updatedAt])
   @@map("chats")
 }
 
@@ -244,17 +284,19 @@ model ChatParticipant {
   chat   Chat   @relation(fields: [chatId], references: [id])
 
   joinedAt DateTime  @default(now()) @map("joined_at")
-  leftAt   DateTime?
+  leftAt   DateTime? @map("left_at")
 
   @@unique([userId, chatId])
+  @@index([chatId])
+  @@index([userId])
   @@map("chat_participants")
 }
 
 model Message {
   id       String  @id @default(uuid())
-  content  String
+  content  String?
   imageUrl String?
-  isRead   Boolean @default(false)
+  isRead   Boolean @default(false) @map("is_read")
 
   senderId String
   sender   User   @relation("SentMessages", fields: [senderId], references: [id])
@@ -265,5 +307,6 @@ model Message {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([chatId, createdAt])
   @@map("messages")
 }

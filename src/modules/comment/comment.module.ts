@@ -2,9 +2,12 @@ import { Module } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { CommentController } from './comment.controller';
 import { PrismaService } from '../../common/prisma.service';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  controllers: [CommentController],
-  providers: [CommentService, PrismaService],
+	imports: [NotificationModule],
+	controllers: [CommentController],
+	providers: [CommentService, PrismaService],
+	exports: [CommentService],
 })
 export class CommentModule {}
