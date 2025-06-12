@@ -8,6 +8,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
 import { FollowService } from '../follow/follow.service';
+import { BlockUserService } from '../block-user/block-user.service';
 
 @Injectable()
 export class PostService {
@@ -15,6 +16,7 @@ export class PostService {
 		private readonly prisma: PrismaService,
 		private readonly cloudinaryService: CloudinaryService,
 		private readonly followService: FollowService,
+		private readonly blockUserService: BlockUserService,
 	) {}
 
 	async create(dto: CreatePostDto, userId: string, file?: Express.Multer.File) {
@@ -33,7 +35,7 @@ export class PostService {
 				photo = uploadResult.secure_url;
 				photoPublicId = uploadResult.public_id;
 			} catch (error) {
-				throw new BadRequestException('Failed to upload image');
+				throw new Error('Failed to upload image');
 			}
 		}
 
@@ -74,13 +76,13 @@ export class PostService {
 
 				if (post.photoPublicId)
 					this.cloudinaryService.deleteFile(post.photoPublicId).catch(() => {
-						console.warn('Could not delete old image after upload');
+						throw new Error('Could not delete old image after upload');
 					});
 
 				photo = uploadResult.secure_url;
 				photoPublicId = uploadResult.public_id;
 			} catch (error) {
-				throw new BadRequestException('Failed to upload image');
+				throw new Error('Failed to upload image');
 			}
 		}
 
@@ -120,7 +122,7 @@ export class PostService {
 			try {
 				await this.cloudinaryService.deleteFile(post.photoPublicId);
 			} catch (error) {
-				console.error('Cloudinary delete error:', error);
+				throw new Error('Cloudinary delete error:', error);
 			}
 		}
 
@@ -131,16 +133,25 @@ export class PostService {
 	async getAll(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
+		const visibleUserIds =
+			await this.blockUserService.getVisibleUserIds(userId);
+
 		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
-				where: { privacy: 'PUBLIC' },
+				where: {
+					privacy: 'PUBLIC',
+					userId: { in: visibleUserIds },
+				},
 				skip,
 				take,
 				orderBy: [{ createdAt: 'desc' }],
 				select: this.select(userId),
 			}),
 			this.prisma.post.count({
-				where: { privacy: 'PUBLIC' },
+				where: {
+					privacy: 'PUBLIC',
+					userId: { in: visibleUserIds },
+				},
 			}),
 		]);
 
@@ -179,11 +190,17 @@ export class PostService {
 		const skip = (page - 1) * take;
 
 		const followingIds = await this.followService.getFollowingIds(userId);
+		const visibleUserIds =
+			await this.blockUserService.getVisibleUserIds(userId);
+
+		const filteredUserIds = [...followingIds, userId].filter(id =>
+			visibleUserIds.includes(id),
+		);
 
 		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
 				where: {
-					userId: { in: [...followingIds, userId] },
+					userId: { in: filteredUserIds },
 					privacy: 'PUBLIC',
 				},
 				skip,
@@ -193,7 +210,7 @@ export class PostService {
 			}),
 			this.prisma.post.count({
 				where: {
-					userId: { in: [...followingIds, userId] },
+					userId: { in: filteredUserIds },
 					privacy: 'PUBLIC',
 				},
 			}),
@@ -213,10 +230,17 @@ export class PostService {
 		const excludedIds = await this.followService.getFollowingIds(userId);
 		excludedIds.push(userId);
 
+		const visibleUserIds =
+			await this.blockUserService.getVisibleUserIds(userId);
+
+		const discoverUserIds = visibleUserIds.filter(
+			id => !excludedIds.includes(id),
+		);
+
 		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
 				where: {
-					userId: { notIn: excludedIds },
+					userId: { in: discoverUserIds },
 					privacy: 'PUBLIC',
 				},
 				skip,
@@ -230,7 +254,7 @@ export class PostService {
 			}),
 			this.prisma.post.count({
 				where: {
-					userId: { notIn: excludedIds },
+					userId: { in: discoverUserIds },
 					privacy: 'PUBLIC',
 				},
 			}),
