@@ -42,49 +42,52 @@ export class SavedPostsService {
 	async getSavedPosts(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
-		const savedPosts = await this.prisma.savedPost.findMany({
-			where: { userId },
-			skip,
-			take,
-			orderBy: { createdAt: 'desc' },
-			select: {
-				post: {
-					select: {
-						id: true,
-						content: true,
-						photo: true,
-						privacy: true,
-						createdAt: true,
-						updatedAt: true,
-						user: {
-							select: {
-								id: true,
-								firstName: true,
-								lastName: true,
-								username: true,
-								avatarUrl: true,
+		const [data, total] = await Promise.all([
+			this.prisma.savedPost.findMany({
+				where: { userId },
+				skip,
+				take,
+				orderBy: { createdAt: 'desc' },
+				select: {
+					post: {
+						select: {
+							id: true,
+							content: true,
+							photo: true,
+							privacy: true,
+							createdAt: true,
+							updatedAt: true,
+							user: {
+								select: {
+									id: true,
+									firstName: true,
+									lastName: true,
+									username: true,
+									avatarUrl: true,
+								},
 							},
-						},
-						_count: {
-							select: {
-								likes: true,
-								comments: true,
+							_count: {
+								select: {
+									likes: true,
+									comments: true,
+								},
 							},
-						},
-						likes: {
-							where: { userId },
-							select: { id: true },
-						},
-						savedBy: {
-							where: { userId },
-							select: { id: true },
+							likes: {
+								where: { userId },
+								select: { id: true },
+							},
+							savedBy: {
+								where: { userId },
+								select: { id: true },
+							},
 						},
 					},
 				},
-			},
-		});
+			}),
+			this.prisma.savedPost.count({ where: { userId } }),
+		]);
 
-		const posts = savedPosts.map(({ post }) => ({
+		const posts = data.map(({ post }) => ({
 			...post,
 			liked: !!post.likes.length,
 			saved: !!post.savedBy.length,
@@ -94,6 +97,7 @@ export class SavedPostsService {
 			data: posts,
 			page,
 			take,
+			total,
 		};
 	}
 
