@@ -39,74 +39,65 @@ export class SavedPostsService {
 		});
 	}
 
-	async getOne(userId: string, postId: string) {
-		await this.postService.getOne(postId);
-
-		const post = await this.prisma.savedPost.findUnique({
-			where: { userId_postId: { userId, postId } },
-		});
-
-		if (!post) throw new NotFoundException('Post is not saved');
-
-		return post;
-	}
-
 	async getSavedPosts(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
 		const [data, total] = await Promise.all([
-			this.prisma.post.findMany({
+			this.prisma.savedPost.findMany({
 				where: { userId },
 				skip,
 				take,
 				orderBy: { createdAt: 'desc' },
 				select: {
-					id: true,
-					content: true,
-					photo: true,
-					privacy: true,
-					createdAt: true,
-					updatedAt: true,
-					user: {
+					post: {
 						select: {
 							id: true,
-							firstName: true,
-							lastName: true,
-							username: true,
-							avatarUrl: true,
+							content: true,
+							photo: true,
+							privacy: true,
+							createdAt: true,
+							updatedAt: true,
+							user: {
+								select: {
+									id: true,
+									firstName: true,
+									lastName: true,
+									username: true,
+									avatarUrl: true,
+								},
+							},
+							_count: {
+								select: {
+									likes: true,
+									comments: true,
+								},
+							},
+							likes: {
+								where: { userId },
+								select: { id: true },
+							},
+							savedBy: {
+								where: { userId },
+								select: { id: true },
+							},
 						},
-					},
-					_count: {
-						select: {
-							likes: true,
-							comments: true,
-						},
-					},
-					likes: {
-						where: { userId },
-						select: { id: true },
-					},
-					savedBy: {
-						where: { userId },
-						select: { id: true },
 					},
 				},
 			}),
-			this.prisma.post.count({ where: { userId } }),
+			this.prisma.savedPost.count({ where: { userId } }),
 		]);
 
-		const posts = data.map(({ likes, savedBy, ...rest }) => ({
-			...rest,
-			liked: !!likes.length,
-			saved: !!savedBy.length,
+		const posts = data.map(({ post }) => ({
+			...post,
+			liked: !!post.likes.length,
+			saved: !!post.savedBy.length,
 		}));
 
 		return {
 			data: posts,
-			total,
 			page,
 			take,
-			totalPages: Math.ceil(total / take),
+			total,
 		};
 	}
 
