@@ -45,11 +45,7 @@ export class PostController {
 	}
 
 	@Get()
-	getAll(
-		@CurrentUser('id') userId: string,
-		@Query('page') page = '1',
-		@Query('take') take = '15',
-	) {
+	getAll(@CurrentUser('id') userId: string, @Query('page') page = '1', @Query('take') take = '15') {
 		return this.postService.getAll(userId, +page, +take);
 	}
 
@@ -81,6 +77,16 @@ export class PostController {
 		@Query('take') take = '10',
 	) {
 		return this.postService.getUserPosts(userId, +page, +take);
+	}
+
+	@Authorization()
+	@Get('user/archive')
+	getUserPrivatePosts(
+		@CurrentUser('id') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '10',
+	) {
+		return this.postService.getUserPrivatePosts(userId, +page, +take);
 	}
 
 	@CheckBlocked('userId')

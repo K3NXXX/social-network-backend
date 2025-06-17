@@ -53,17 +53,11 @@ export class PostService {
 		return post;
 	}
 
-	async update(
-		id: string,
-		userId: string,
-		dto: UpdatePostDto,
-		file?: Express.Multer.File,
-	) {
+	async update(id: string, userId: string, dto: UpdatePostDto, file?: Express.Multer.File) {
 		const post = await this.prisma.post.findUnique({ where: { id } });
 
 		if (!post) throw new NotFoundException('Post not found');
-		if (post.userId !== userId)
-			throw new ForbiddenException('You cannot update this post');
+		if (post.userId !== userId) throw new ForbiddenException('You cannot update this post');
 
 		const content = dto.content?.trim() ?? post.content;
 
@@ -87,9 +81,7 @@ export class PostService {
 		}
 
 		if (!content && !photo)
-			throw new BadRequestException(
-				'Post must contain at least content or image',
-			);
+			throw new BadRequestException('Post must contain at least content or image');
 
 		const updated = await this.prisma.post.update({
 			where: { id },
@@ -133,8 +125,7 @@ export class PostService {
 	async getAll(userId: string, page: number, take: number) {
 		const skip = (page - 1) * take;
 
-		const visibleUserIds =
-			await this.blockUserService.getVisibleUserIds(userId);
+		const visibleUserIds = await this.blockUserService.getVisibleUserIds(userId);
 
 		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
@@ -190,12 +181,9 @@ export class PostService {
 		const skip = (page - 1) * take;
 
 		const followingIds = await this.followService.getFollowingIds(userId);
-		const visibleUserIds =
-			await this.blockUserService.getVisibleUserIds(userId);
+		const visibleUserIds = await this.blockUserService.getVisibleUserIds(userId);
 
-		const filteredUserIds = [...followingIds, userId].filter(id =>
-			visibleUserIds.includes(id),
-		);
+		const filteredUserIds = [...followingIds, userId].filter(id => visibleUserIds.includes(id));
 
 		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
@@ -230,12 +218,9 @@ export class PostService {
 		const excludedIds = await this.followService.getFollowingIds(userId);
 		excludedIds.push(userId);
 
-		const visibleUserIds =
-			await this.blockUserService.getVisibleUserIds(userId);
+		const visibleUserIds = await this.blockUserService.getVisibleUserIds(userId);
 
-		const discoverUserIds = visibleUserIds.filter(
-			id => !excludedIds.includes(id),
-		);
+		const discoverUserIds = visibleUserIds.filter(id => !excludedIds.includes(id));
 
 		const [data, total] = await Promise.all([
 			this.prisma.post.findMany({
@@ -286,6 +271,37 @@ export class PostService {
 				where: {
 					userId,
 					privacy: 'PUBLIC',
+				},
+			}),
+		]);
+
+		return {
+			data: this.formatPosts(data),
+			total,
+			page,
+			take,
+			totalPages: Math.ceil(total / take),
+		};
+	}
+
+	async getUserPrivatePosts(userId: string, page: number, take: number) {
+		const skip = (page - 1) * take;
+
+		const [data, total] = await Promise.all([
+			this.prisma.post.findMany({
+				where: {
+					userId,
+					privacy: 'PRIVATE',
+				},
+				skip,
+				take,
+				orderBy: { createdAt: 'desc' },
+				select: this.select(userId),
+			}),
+			this.prisma.post.count({
+				where: {
+					userId,
+					privacy: 'PRIVATE',
 				},
 			}),
 		]);
