@@ -1,8 +1,4 @@
-import {
-	ConflictException,
-	Injectable,
-	NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { PostService } from '../post/post.service';
 
@@ -97,7 +93,7 @@ export class SavedPostsService {
 			data: posts,
 			page,
 			take,
-			total,
+			totalPages: Math.ceil(total / take),
 		};
 	}
 
