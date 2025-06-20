@@ -172,8 +172,8 @@ export class PostService {
 
 		return {
 			...rest,
-			liked: !!likes,
-			saved: !!savedBy,
+			liked: !!likes.length,
+			saved: !!savedBy.length,
 		};
 	}
 
