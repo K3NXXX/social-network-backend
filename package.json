@@ -28,6 +28,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-socket.io": "^11.1.2",
+    "@nestjs/throttler": "^6.4.0",
     "@nestjs/websockets": "^11.1.2",
     "@prisma/client": "^6.10.1",
     "@react-email/components": "^0.0.41",

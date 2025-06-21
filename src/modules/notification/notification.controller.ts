@@ -9,7 +9,7 @@ export class NotificationController {
 
 	@Authorization()
 	@Get('notifications')
-	getForUser(@CurrentUser('id') userId: string) {
+	async getForUser(@CurrentUser('id') userId: string) {
 		return this.notificationService.getUserNotifications(userId);
 	}
 

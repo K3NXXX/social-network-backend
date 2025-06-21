@@ -7,11 +7,34 @@ export class NotificationService {
 	constructor(private prisma: PrismaService) {}
 
 	async create(dto: CreateNotificationDto) {
-		return this.prisma.notification.create({
+		const notification = await this.prisma.notification.create({
 			data: {
 				...dto,
 			},
 		});
+
+		const count = await this.prisma.notification.count({
+			where: { userId: dto.userId },
+		});
+
+		if (count > 50) {
+			const excess = count - 50;
+
+			const oldest = await this.prisma.notification.findMany({
+				where: { userId: dto.userId },
+				orderBy: { createdAt: 'asc' },
+				take: excess,
+				select: { id: true },
+			});
+
+			const idsToDelete = oldest.map(n => n.id);
+
+			await this.prisma.notification.deleteMany({
+				where: { id: { in: idsToDelete } },
+			});
+		}
+
+		return notification;
 	}
 
 	async getUserNotifications(userId: string) {
@@ -46,24 +69,15 @@ export class NotificationService {
 
 	async markAllAsRead(userId: string) {
 		return this.prisma.notification.updateMany({
-			where: {
-				userId,
-				isRead: false,
-			},
-			data: {
-				isRead: true,
-			},
+			where: { userId, isRead: false },
+			data: { isRead: true },
 		});
 	}
 
 	async markAsRead(notificationId: string) {
 		return this.prisma.notification.update({
-			where: {
-				id: notificationId,
-			},
-			data: {
-				isRead: true,
-			},
+			where: { id: notificationId },
+			data: { isRead: true },
 		});
 	}
 }

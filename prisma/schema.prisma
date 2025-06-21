@@ -255,8 +255,14 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([userId, createdAt])  
+  @@index([senderId])
+  @@index([postId])
+  @@index([likeId])
+  @@index([commentId])
   @@map("notifications")
 }
+
 
 model Chat {
   id      String  @id @default(uuid())
