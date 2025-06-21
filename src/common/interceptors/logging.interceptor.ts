@@ -1,7 +1,7 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -9,26 +9,17 @@ export class LoggingInterceptor implements NestInterceptor {
 
 	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
 		const request = context.switchToHttp().getRequest<Request>();
-		const response = context.switchToHttp().getResponse<Response>();
-		const { method, url, ip } = request;
 		const userAgentString = request.headers['user-agent'] || 'Unknown';
-		const userIp = ip || 'Unknown';
-
-		const now = Date.now();
-
-		this.logger.log(`${method} ${url} - ${userIp} - ${userAgentString}`);
+		const userIp = request.ip || 'Unknown';
+		const userId = (request as any).user?.id || 'Anonymous';
 
 		return next.handle().pipe(
 			tap({
 				next: data => {
-					const responseTime = Date.now() - now;
-					this.logger.log(`${method} ${url} - ${response.statusCode} - ${responseTime}ms`);
+					this.logger.log(`User ${userId} (${userIp}) - ${userAgentString}`);
 				},
 				error: error => {
-					const responseTime = Date.now() - now;
-					this.logger.error(
-						`${method} ${url} - ${error.status || 500} - ${responseTime}ms - ${error.message}`,
-					);
+					this.logger.error(`User ${userId} - ${error.status || 500} - ${error.message}`);
 				},
 			}),
 		);
