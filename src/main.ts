@@ -20,10 +20,7 @@ async function bootstrap() {
 		app.use(cookieParser());
 
 		app.enableCors({
-			origin: [
-				'http://localhost:5173',
-				'https://social-network-frontend-bgrblckeu-k3nxs-projects.vercel.app',
-			],
+			origin: ['http://localhost:5173', 'https://vetra-social-network-frontend.vercel.app'],
 			credentials: true,
 			methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 		});
