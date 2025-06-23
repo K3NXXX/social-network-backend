@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaService } from './common/prisma.service';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -23,6 +24,12 @@ import { SavedPostsModule } from './modules/saved-posts/saved-posts.module';
 		ConfigModule.forRoot({
 			isGlobal: true,
 		}),
+		ThrottlerModule.forRoot([
+			{
+				ttl: 60000,
+				limit: 100,
+			},
+		]),
 		UserModule,
 		AuthModule,
 		CloudinaryModule,

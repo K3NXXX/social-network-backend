@@ -15,6 +15,7 @@ import { Authorization } from '../../common/decorators/auth.decorator';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
 import { PostService } from './post.service';
+import { CheckBlocked } from '../../common/decorators/check-blocked.decorator';
 
 @Controller('posts')
 export class PostController {
@@ -44,11 +45,7 @@ export class PostController {
 	}
 
 	@Get()
-	getAll(
-		@CurrentUser('id') userId: string,
-		@Query('page') page = '1',
-		@Query('take') take = '15',
-	) {
+	getAll(@CurrentUser('id') userId: string, @Query('page') page = '1', @Query('take') take = '15') {
 		return this.postService.getAll(userId, +page, +take);
 	}
 
@@ -82,6 +79,17 @@ export class PostController {
 		return this.postService.getUserPosts(userId, +page, +take);
 	}
 
+	@Authorization()
+	@Get('user/archive')
+	getUserPrivatePosts(
+		@CurrentUser('id') userId: string,
+		@Query('page') page = '1',
+		@Query('take') take = '10',
+	) {
+		return this.postService.getUserPrivatePosts(userId, +page, +take);
+	}
+
+	@CheckBlocked('userId')
 	@Get('user/:userId')
 	getOtherUserPosts(
 		@Param('userId') userId: string,
@@ -92,6 +100,7 @@ export class PostController {
 	}
 
 	@Authorization()
+	@CheckBlocked('id')
 	@Get(':id')
 	getPost(@Param('id') id: string, @CurrentUser('id') userId: string) {
 		return this.postService.getOne(id, userId);

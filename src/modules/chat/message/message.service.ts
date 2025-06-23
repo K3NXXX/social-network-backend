@@ -63,38 +63,36 @@ export class MessageService {
 	) {
 		const chat = await this.chatService.getChat(userId, receiverId);
 
-		if (!chat)
+		if (!chat) {
 			return {
 				messages: [],
 				chat: null,
 				hasNextPage: false,
 				nextCursor: null,
 			};
-
-		const where: any = { chatId: chat.id };
-
-		if (cursor) where.id = { lt: cursor };
+		}
 
 		const messages = await this.prisma.message.findMany({
-			where,
+			where: {
+				chatId: chat.id,
+				...(cursor && { id: { lt: cursor } }),
+			},
 			orderBy: { createdAt: 'desc' },
 			take: take + 1,
 			include: {
-				sender: {
-					select: this.USER,
-				},
+				sender: { select: this.USER },
 			},
 		});
 
 		const hasNextPage = messages.length > take;
 
-		if (hasNextPage) messages.pop();
+		const trimmed = hasNextPage ? messages.slice(0, -1) : messages;
 
 		return {
 			chat,
-			messages: messages.reverse(),
+			messages: trimmed.reverse(),
 			hasNextPage,
-			nextCursor: messages.length ? messages[0].id : null,
+			nextCursor: hasNextPage ? trimmed[0].id : null,
 		};
 	}
 

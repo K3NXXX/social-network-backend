@@ -10,7 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { InternalServerErrorException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { MessageService } from './message/message.service';
 import { MessageDto } from './message/dto/message.dto';
 import { UserService } from '../user/user.service';
@@ -41,7 +41,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 				(authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
 
 			if (!token) {
-				client.emit(ChatEvents.Error, { message: 'Unauthorized' });
+				client.emit(ChatEvents.Error, {
+					message: 'Unauthorized: Token not provided',
+					code: 'NO_TOKEN',
+				});
 				client.disconnect();
 				return;
 			}
@@ -67,10 +70,26 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
 			this.logger.log(`User connected: ${userId}`);
 		} catch (error) {
-			this.logger.warn(`Socket auth failed: ${error}`);
-			client.emit(ChatEvents.Error, { message: 'Unauthorized' });
+			this.logger.warn(`Socket auth failed: ${error.name} - ${error.message}`);
+
+			if (error.name === 'TokenExpiredError') {
+				client.emit(ChatEvents.Error, {
+					message: 'Token expired',
+					code: 'TOKEN_EXPIRED',
+				});
+			} else if (error.name === 'JsonWebTokenError') {
+				client.emit(ChatEvents.Error, {
+					message: 'Invalid token',
+					code: 'INVALID_TOKEN',
+				});
+			} else {
+				client.emit(ChatEvents.Error, {
+					message: 'Unauthorized',
+					code: 'UNAUTHORIZED',
+				});
+			}
+
 			client.disconnect();
-			throw error;
 		}
 	}
 
@@ -114,14 +133,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	) {
 		try {
 			const senderId = client.data.user?.id;
-			if (!senderId)
-				throw new InternalServerErrorException('User ID not found in socket');
+			if (!senderId) {
+				this.logger.error('User ID not found in socket');
+				client.emit(ChatEvents.Error, 'User ID not found in socket');
+			}
 
 			const message = await this.messageService.sendMessage(senderId, dto);
 
 			const chatId = message.chat?.id;
-			if (!chatId)
-				throw new InternalServerErrorException('Chat ID missing in message');
+			if (!chatId) {
+				this.logger.error('Chat ID missing in message');
+				client.emit(ChatEvents.Error, 'Chat ID missing in message');
+			}
 
 			client.join(chatId);
 
@@ -131,8 +154,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 				client.emit(ChatEvents.ChatCreated, chat);
 
 				const receiverId = dto.receiverId;
-				if (!receiverId)
-					throw new InternalServerErrorException('Receiver ID is missing');
+				if (!receiverId) {
+					this.logger.error('Receiver ID is missing');
+					client.emit(ChatEvents.Error, 'Receiver ID is missing');
+				}
 
 				const receiverSocketIds = this.userSockets.get(receiverId) ?? new Set();
 				for (const id of receiverSocketIds) {
@@ -161,8 +186,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	) {
 		try {
 			const userId = client.data.user?.id;
-			if (!userId)
-				throw new InternalServerErrorException('User not found in socket');
+			if (!userId) {
+				this.logger.error('User not found in socket');
+				client.emit(ChatEvents.Error, 'User not found in socket');
+			}
 
 			if (!data?.messageId) {
 				client.emit(ChatEvents.Error, { message: 'Message ID is required' });
@@ -189,7 +216,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		} catch (error) {
 			this.logger.error(`Error marking message as seen: ${error.message}`);
 			client.emit(ChatEvents.Error, { message: error.message });
-			throw error;
 		}
 	}
 }

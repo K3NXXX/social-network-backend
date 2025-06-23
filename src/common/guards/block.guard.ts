@@ -1,30 +1,41 @@
 import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
+	CanActivate,
+	ExecutionContext,
+	ForbiddenException,
+	Injectable,
 } from '@nestjs/common';
 import { BlockUserService } from '../../modules/block-user/block-user.service';
-import { User } from '@prisma/client';
+import { Reflector } from '@nestjs/core';
+import { IS_BLOCKED_META_KEY } from '../decorators/check-blocked.decorator';
 
 @Injectable()
-export class BlockedUsersGuard implements CanActivate {
-  constructor(private readonly blockedUserService: BlockUserService) {}
+export class CheckBlockedGuard implements CanActivate {
+	constructor(
+		private readonly blockUserService: BlockUserService,
+		private readonly reflector: Reflector,
+	) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const currentUser: User = request.user;
-    const targetUserId = request.params.id || request.body.userId;
+	async canActivate(context: ExecutionContext): Promise<boolean> {
+		const target = this.reflector.get<string>(
+			IS_BLOCKED_META_KEY,
+			context.getHandler(),
+		);
 
-    if (!currentUser || !targetUserId || currentUser.id === targetUserId)
-      return true;
+		if (!target) return true;
 
-    const isBlocked = await this.blockedUserService.isBlocked(
-      currentUser.id,
-      targetUserId,
-    );
-    if (isBlocked) throw new ForbiddenException('Blocked user interaction');
+		const request = context.switchToHttp().getRequest();
+		const viewerId = request.user?.id;
+		const targetUserId = request.params[target];
 
-    return true;
-  }
+		if (!viewerId || !targetUserId) return true;
+
+		const isBlocked = await this.blockUserService.isBlocked(
+			targetUserId,
+			viewerId,
+		);
+		if (isBlocked)
+			throw new ForbiddenException('You are blocked by this user.');
+
+		return true;
+	}
 }

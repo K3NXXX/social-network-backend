@@ -7,6 +7,7 @@ import { PostService } from '../post/post.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { FollowService } from '../follow/follow.service';
 import { CommentService } from '../comment/comment.service';
+import { BlockUserService } from '../block-user/block-user.service';
 
 @Module({
 	imports: [NotificationModule],
@@ -18,6 +19,7 @@ import { CommentService } from '../comment/comment.service';
 		CloudinaryService,
 		FollowService,
 		CommentService,
+		BlockUserService,
 	],
 	exports: [LikeService],
 })

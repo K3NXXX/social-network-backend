@@ -4,9 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE")
+  directUrl = env("DIRECT_URL")  
 }
 
 enum Gender {
@@ -181,7 +181,7 @@ model Like {
   user   User   @relation(fields: [userId], references: [id])
 
   postId String?
-  post   Post?   @relation(fields: [postId], references: [id])
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   commentId String?
   comment   Comment? @relation(fields: [commentId], references: [id])
@@ -203,7 +203,7 @@ model SavedPost {
   user   User   @relation(fields: [userId], references: [id])
 
   postId String
-  post   Post   @relation(fields: [postId], references: [id])
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -212,7 +212,8 @@ model SavedPost {
   @@index([userId])
   @@index([postId])
   @@map("saved_posts")
-}
+} 
+
 
 model Follow {
   id String @id @default(uuid())
@@ -254,8 +255,14 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([userId, createdAt])  
+  @@index([senderId])
+  @@index([postId])
+  @@index([likeId])
+  @@index([commentId])
   @@map("notifications")
 }
+
 
 model Chat {
   id      String  @id @default(uuid())

@@ -18,6 +18,7 @@ import { UserService } from './user.service';
 import { FollowService } from '../follow/follow.service';
 import { AccountDto } from './dto/account.dto';
 import { EmailService } from '../auth/email/email.service';
+import { CheckBlocked } from '../../common/decorators/check-blocked.decorator';
 
 @Controller('user')
 export class UserController {
@@ -38,6 +39,7 @@ export class UserController {
 		return this.userService.getProfile(userId);
 	}
 
+	@CheckBlocked('id')
 	@Get('profile/:id')
 	async getProfile(@Param('id') userId: string) {
 		return this.userService.getProfile(userId);

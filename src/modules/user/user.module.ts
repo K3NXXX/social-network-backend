@@ -7,10 +7,17 @@ import { NotificationModule } from '../notification/notification.module';
 import { RedisModule } from '../../common/redis.module';
 import { EmailModule } from '../auth/email/email.module';
 import { FollowService } from '../follow/follow.service';
+import { BlockUserService } from '../block-user/block-user.service';
 
 @Module({
 	imports: [NotificationModule, RedisModule, forwardRef(() => EmailModule)],
 	controllers: [UserController],
-	providers: [UserService, PrismaService, CloudinaryService, FollowService],
+	providers: [
+		UserService,
+		PrismaService,
+		CloudinaryService,
+		FollowService,
+		BlockUserService,
+	],
 })
 export class UserModule {}

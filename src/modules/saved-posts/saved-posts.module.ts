@@ -7,6 +7,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationsGateway } from '../notification/notifications.gateway';
 import { FollowService } from '../follow/follow.service';
+import { BlockUserService } from '../block-user/block-user.service';
 
 @Module({
 	controllers: [SavedPostsController],
@@ -18,6 +19,7 @@ import { FollowService } from '../follow/follow.service';
 		FollowService,
 		NotificationService,
 		NotificationsGateway,
+		BlockUserService,
 	],
 })
 export class SavedPostsModule {}
